@@ -698,8 +698,8 @@
         let sourceDocuments = [];
 
         // Replace loading indicator with content bubble
-        botDiv.innerHTML = `<div class="bot-bubble" id="botContent"></div>`;
-        const botContent = document.getElementById('botContent');
+        botDiv.innerHTML = `<div class="bot-bubble"></div>`;
+        const botContent = botDiv.querySelector('.bot-bubble');
 
         while (true) {
           const { value, done } = await reader.read();

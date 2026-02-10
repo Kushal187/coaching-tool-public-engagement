@@ -49,7 +49,7 @@ const openaiClient = new OpenAI({
 // ──── Constants ──────────────────────────────────────────────
 const COLLECTION_NAME = 'CoachingTool';
 const MAX_RESULTS = parseInt(process.env.CHATBOT_MAX_RESULTS, 10) || 5;
-const MODEL = process.env.CHATBOT_MODEL || 'gpt-4.1';
+const MODEL = process.env.CHATBOT_MODEL || 'gpt-5.2';
 
 const CHUNK_FIELDS = `
   objectId
