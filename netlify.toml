@@ -1,0 +1,13 @@
+[build]
+  command = "echo 'No build step required'"
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  # 30-second timeout for chatbot streaming
+  external_node_modules = ["pdf-parse"]
+
+[dev]
+  port = 8888
+  functions = "netlify/functions"
