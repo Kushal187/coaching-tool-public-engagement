@@ -6,8 +6,13 @@
     "node": ">=20.12.2"
   },
   "scripts": {
+    "convert": "python scripts/convert-pdfs.py",
+    "convert:force": "python scripts/convert-pdfs.py --force",
     "ingest": "node scripts/ingest-pdfs.mjs",
     "ingest:clear": "node scripts/ingest-pdfs.mjs --clear",
+    "ingest:simple": "node scripts/ingest-pdfs.mjs --simple",
+    "pipeline": "npm run convert && npm run ingest",
+    "pipeline:clear": "npm run convert && npm run ingest:clear",
     "dev": "netlify dev",
     "build": "echo 'No build step required'"
   },
@@ -15,7 +20,6 @@
     "@netlify/functions": "^5.1.0",
     "dotenv": "^16.4.7",
     "openai": "^4.57.1",
-    "pdf-parse": "^1.1.1",
     "uuid": "^11.1.0",
     "weaviate-ts-client": "^2.2.0"
   }

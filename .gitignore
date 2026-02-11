@@ -8,6 +8,9 @@ package-lock.json
 # Override Python template's lib/ exclusion — our lib/ has source code
 !lib/
 
+# Docling-converted Markdown files (generated from PDFs)
+documents/converted/
+
 # ──────────────────────────────────────────────
 # Python (original template)
 # ──────────────────────────────────────────────

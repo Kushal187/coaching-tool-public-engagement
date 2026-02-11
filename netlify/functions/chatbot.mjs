@@ -5,7 +5,7 @@
 //
 // Flow:
 //   1. Receive user question (POST { message, conversation })
-//   2. Search Weaviate CoachingTool collection (BM25 → nearText fallback)
+//   2. Search Weaviate CoachingTool collection (hybrid: BM25 + vector)
 //   3. Format top results as context
 //   4. Stream an OpenAI GPT response back as SSE
 //   5. Append source documents at the end
@@ -56,78 +56,53 @@ const CHUNK_FIELDS = `
   sourceFile
   title
   chapterTitle
+  sectionPath
+  contextPrefix
   content
   chunkIndex
-  _additional { id distance certainty }
+  _additional { id score }
 `;
 
-// ──── Search helpers (BM25 → nearText fallback) ──────────────
-// Adapted from chatbot_reboot.mjs searchWeaviate()
-
-async function searchWeaviate(query) {
-  // 1. BM25 keyword search
-  try {
-    const bm25Res = await weaviateClient.graphql
-      .get()
-      .withClassName(COLLECTION_NAME)
-      .withFields(CHUNK_FIELDS)
-      .withBm25({ query })
-      .withLimit(MAX_RESULTS)
-      .do();
-
-    const bm25Hits = bm25Res?.data?.Get?.[COLLECTION_NAME] ?? [];
-    if (bm25Hits.length > 0) {
-      console.log(`BM25 search returned ${bm25Hits.length} hit(s)`);
-      return bm25Hits;
-    }
-  } catch (err) {
-    console.warn('BM25 search failed, falling back to nearText:', err.message);
-  }
-
-  // 2. Semantic (nearText) fallback
-  try {
-    const vecRes = await weaviateClient.graphql
-      .get()
-      .withClassName(COLLECTION_NAME)
-      .withFields(CHUNK_FIELDS)
-      .withNearText({ concepts: [query] })
-      .withLimit(MAX_RESULTS)
-      .do();
-
-    const vecHits = vecRes?.data?.Get?.[COLLECTION_NAME] ?? [];
-    console.log(`nearText search returned ${vecHits.length} hit(s)`);
-    return vecHits;
-  } catch (err) {
-    console.error('nearText search failed:', err.message);
-    return [];
-  }
-}
+// ──── Search helper (hybrid: BM25 + vector fusion) ───────────
 
 /**
- * Main search entry point.
- * Runs BM25 → nearText, then filters/sorts results.
+ * Search Weaviate using hybrid search (fuses BM25 keyword +
+ * vector semantic results in a single query).
+ * alpha = 0.5 gives equal weight to keyword and vector signals.
  */
 async function searchContent(query) {
   try {
-    const hits = await searchWeaviate(query);
+    const res = await weaviateClient.graphql
+      .get()
+      .withClassName(COLLECTION_NAME)
+      .withFields(CHUNK_FIELDS)
+      .withHybrid({ query, alpha: 0.5 })
+      .withLimit(MAX_RESULTS)
+      .do();
 
-    // Exact-match filter (case-insensitive substring)
-    const lowerQuery = query.toLowerCase();
-    const exactMatches = hits.filter((h) => {
-      const searchable = [h.content, h.title, h.chapterTitle, h.sourceFile].filter(Boolean);
-      return searchable.some((f) => f.toLowerCase().includes(lowerQuery));
-    });
-
-    // Prefer exact matches; otherwise fall back to distance sort
-    const pool = exactMatches.length > 0 ? exactMatches : hits;
-    const sorted = pool.sort(
-      (a, b) => (a._additional?.distance ?? 1) - (b._additional?.distance ?? 1)
-    );
-
-    return sorted.slice(0, MAX_RESULTS);
+    const hits = res?.data?.Get?.[COLLECTION_NAME] ?? [];
+    console.log(`Hybrid search returned ${hits.length} hit(s)`);
+    return hits;
   } catch (err) {
-    console.error('searchContent error:', err);
-    return [];
+    console.error('Hybrid search failed:', err.message);
+
+    // Fallback: try nearText if hybrid is unavailable
+    try {
+      const fallbackRes = await weaviateClient.graphql
+        .get()
+        .withClassName(COLLECTION_NAME)
+        .withFields(CHUNK_FIELDS)
+        .withNearText({ concepts: [query] })
+        .withLimit(MAX_RESULTS)
+        .do();
+
+      const fallbackHits = fallbackRes?.data?.Get?.[COLLECTION_NAME] ?? [];
+      console.log(`nearText fallback returned ${fallbackHits.length} hit(s)`);
+      return fallbackHits;
+    } catch (fallbackErr) {
+      console.error('nearText fallback also failed:', fallbackErr.message);
+      return [];
+    }
   }
 }
 
@@ -141,9 +116,11 @@ function formatSearchResults(results) {
 
   return results
     .map((r) => {
-      const header = r.chapterTitle
-        ? `**${r.title || 'Untitled'}** — _${r.chapterTitle}_ (source: ${r.sourceFile || 'unknown'})`
-        : `**${r.title || 'Untitled'}** (source: ${r.sourceFile || 'unknown'}, chunk ${r.chunkIndex ?? '?'})`;
+      const docTitle = r.title || 'Untitled';
+      const section = r.sectionPath || r.chapterTitle || '';
+      const header = section
+        ? `**${docTitle}** — _${section}_ (source: ${r.sourceFile || 'unknown'})`
+        : `**${docTitle}** (source: ${r.sourceFile || 'unknown'}, chunk ${r.chunkIndex ?? '?'})`;
       return `${header}\n${r.content || ''}`;
     })
     .join('\n\n---\n\n');
@@ -234,19 +211,23 @@ Instructions:
 
     // ── 4. Append source documents ──────────────────────────
     const sourceDocuments = searchResults
-      .map((r) => ({
-        title: r.chapterTitle
-          ? `${r.title || r.sourceFile} — ${r.chapterTitle}`
-          : r.title || r.sourceFile || 'Unknown',
-        sourceFile: r.sourceFile || '',
-        chapterTitle: r.chapterTitle || '',
-        chunkIndex: r.chunkIndex ?? null,
-      }))
-      // Deduplicate by sourceFile + chapterTitle
+      .map((r) => {
+        const section = r.sectionPath || r.chapterTitle || '';
+        return {
+          title: section
+            ? `${r.title || r.sourceFile} — ${section}`
+            : r.title || r.sourceFile || 'Unknown',
+          sourceFile: r.sourceFile || '',
+          sectionPath: section,
+          chapterTitle: r.chapterTitle || '',
+          chunkIndex: r.chunkIndex ?? null,
+        };
+      })
+      // Deduplicate by sourceFile + sectionPath
       .filter(
         (doc, i, arr) =>
           arr.findIndex(
-            (d) => d.sourceFile === doc.sourceFile && d.chapterTitle === doc.chapterTitle
+            (d) => d.sourceFile === doc.sourceFile && d.sectionPath === doc.sectionPath
           ) === i
       );
 

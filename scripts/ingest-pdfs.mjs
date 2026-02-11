@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 // scripts/ingest-pdfs.mjs
 // ─────────────────────────────────────────────────────────────
-// CLI script: read every PDF in ./documents/, chunk each one
-// using an LLM-based strategy, and index the chunks into Weaviate.
+// CLI script: read every converted Markdown file in
+// ./documents/converted/, chunk each one using structure-aware
+// heading-based splitting, and index the chunks into Weaviate.
+//
+// Prerequisites:
+//   Run `python scripts/convert-pdfs.py` first to convert PDFs
+//   to Markdown using Docling.
 //
 // Usage:
-//   node scripts/ingest-pdfs.mjs              # LLM-based chunking
+//   node scripts/ingest-pdfs.mjs              # structure-aware chunking
 //   node scripts/ingest-pdfs.mjs --simple     # fast word-boundary chunking
 //   node scripts/ingest-pdfs.mjs --clear      # wipe collection first
 //   node scripts/ingest-pdfs.mjs --clear --simple
@@ -15,16 +20,16 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import pdfParse from 'pdf-parse';
 import { v5 as uuidv5 } from 'uuid';
 
-import { weaviateClient, openaiClient } from '../lib/weaviate-client.mjs';
+import { weaviateClient } from '../lib/weaviate-client.mjs';
 import { chunkDocument } from '../lib/chunking.mjs';
 import { ensureSchema, deleteSchema, COLLECTION_NAME } from '../lib/schema.mjs';
 
 // ──── Constants ──────────────────────────────────────────────
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DOCUMENTS_DIR = path.resolve(__dirname, '..', 'documents');
+const CONVERTED_DIR = path.resolve(DOCUMENTS_DIR, 'converted');
 
 // UUID namespace – same as the rebootdemocracy source
 const UUID_NS = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -33,22 +38,24 @@ const makeUuid = (s) => uuidv5(s, UUID_NS);
 // ──── Helpers ────────────────────────────────────────────────
 
 /**
- * Derive a human-readable title from the PDF filename.
- * "my-cool-document.pdf" → "My Cool Document"
+ * Derive a human-readable title from the Markdown content.
+ * Looks for the first `# ` heading; falls back to filename.
  */
-function titleFromFilename(filename) {
-  return filename
-    .replace(/\.pdf$/i, '')
-    .replace(/[-_]+/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+function titleFromMarkdown(markdown, filename) {
+  const match = markdown.match(/^#\s+(.+)$/m);
+  if (match) return match[1].trim();
+  return titleFromFilename(filename);
 }
 
 /**
- * Extract plain text from a PDF buffer.
+ * Derive a human-readable title from the filename.
+ * "my-cool-document.md" → "My Cool Document"
  */
-async function extractText(pdfBuffer) {
-  const data = await pdfParse(pdfBuffer);
-  return data.text;
+function titleFromFilename(filename) {
+  return filename
+    .replace(/\.md$/i, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**
@@ -102,6 +109,8 @@ async function indexChunk(chunk) {
       sourceFile: chunk.sourceFile,
       title: chunk.title,
       chapterTitle: chunk.chapterTitle || '',
+      sectionPath: chunk.sectionPath || '',
+      contextPrefix: chunk.contextPrefix || '',
       content: chunk.content,
       chunkIndex: chunk.chunkIndex,
     })
@@ -115,8 +124,8 @@ async function main() {
   const simpleMode = args.includes('--simple');
 
   console.log('══════════════════════════════════════════');
-  console.log(' PDF → Weaviate Ingestion Pipeline');
-  console.log(`  Mode: ${simpleMode ? 'Simple (word-boundary)' : 'LLM-based intelligent chunking'}`);
+  console.log(' Markdown → Weaviate Ingestion Pipeline');
+  console.log(`  Mode: ${simpleMode ? 'Simple (word-boundary)' : 'Structure-aware heading-based chunking'}`);
   console.log('══════════════════════════════════════════');
 
   // Optionally wipe the collection
@@ -128,56 +137,57 @@ async function main() {
   // Ensure collection schema exists
   await ensureSchema();
 
-  // Discover PDF files
-  if (!fs.existsSync(DOCUMENTS_DIR)) {
-    console.error(`\nError: documents directory not found at ${DOCUMENTS_DIR}`);
-    console.error('Create it and place your PDF files inside.');
+  // Check for converted directory
+  if (!fs.existsSync(CONVERTED_DIR)) {
+    console.error(`\nError: converted documents directory not found at ${CONVERTED_DIR}`);
+    console.error('Run "npm run convert" (or "python scripts/convert-pdfs.py") first.');
     process.exit(1);
   }
 
-  const pdfFiles = fs.readdirSync(DOCUMENTS_DIR).filter((f) => /\.pdf$/i.test(f));
+  const mdFiles = fs.readdirSync(CONVERTED_DIR).filter((f) => /\.md$/i.test(f));
 
-  if (pdfFiles.length === 0) {
-    console.log('\nNo PDF files found in ./documents/');
-    console.log('Place your PDF files there and re-run: npm run ingest');
+  if (mdFiles.length === 0) {
+    console.log('\nNo Markdown files found in ./documents/converted/');
+    console.log('Run "npm run convert" first to convert your PDFs.');
     process.exit(0);
   }
 
-  console.log(`\nFound ${pdfFiles.length} PDF file(s) in ./documents/\n`);
+  console.log(`\nFound ${mdFiles.length} Markdown file(s) in ./documents/converted/\n`);
 
   let totalChunks = 0;
 
-  for (const filename of pdfFiles) {
-    const filePath = path.join(DOCUMENTS_DIR, filename);
+  for (const filename of mdFiles) {
+    const filePath = path.join(CONVERTED_DIR, filename);
     console.log(`▸ Processing: ${filename}`);
 
-    // 1. Read & extract text
-    const pdfBuffer = fs.readFileSync(filePath);
-    const text = await extractText(pdfBuffer);
+    // 1. Read the converted Markdown
+    const text = fs.readFileSync(filePath, 'utf-8');
 
     if (!text || text.trim().length === 0) {
-      console.log(`  ⚠ No extractable text – skipping.\n`);
+      console.log(`  ⚠ Empty file – skipping.\n`);
       continue;
     }
 
     const lineCount = text.split('\n').length;
-    console.log(`  Extracted ${text.length} characters (${lineCount} lines).`);
+    console.log(`  Read ${text.length} characters (${lineCount} lines).`);
 
-    // 2. Chunk using LLM strategy (or simple fallback)
-    const chunks = await chunkDocument({
+    // 2. Derive title from the Markdown content
+    const title = titleFromMarkdown(text, filename);
+
+    // 3. Chunk using structure-aware strategy (or simple fallback)
+    const chunks = chunkDocument({
       text,
       sourceFile: filename,
-      title: titleFromFilename(filename),
-      openaiClient,
+      title,
       simple: simpleMode,
     });
 
     console.log(`  Split into ${chunks.length} chunk(s).`);
 
-    // 3. Delete old chunks for this file (idempotent re-ingestion)
+    // 4. Delete old chunks for this file (idempotent re-ingestion)
     await deleteChunksForFile(filename);
 
-    // 4. Index each chunk
+    // 5. Index each chunk
     for (const chunk of chunks) {
       await indexChunk(chunk);
     }
@@ -186,7 +196,7 @@ async function main() {
   }
 
   console.log('══════════════════════════════════════════');
-  console.log(`Done. Indexed ${totalChunks} chunk(s) from ${pdfFiles.length} PDF(s).`);
+  console.log(`Done. Indexed ${totalChunks} chunk(s) from ${mdFiles.length} file(s).`);
   console.log('══════════════════════════════════════════');
 }
 
