@@ -15,7 +15,10 @@
     "ingest:clear": "node scripts/ingest-pdfs.mjs --clear",
     "ingest:simple": "node scripts/ingest-pdfs.mjs --simple",
     "pipeline": "npm run convert && npm run ingest",
-    "pipeline:clear": "npm run convert && npm run ingest:clear"
+    "pipeline:clear": "npm run convert && npm run ingest:clear",
+    "ingest:excel": "python scripts/ingest.py",
+    "ingest:excel:clear": "python scripts/ingest.py --clear",
+    "ingest:excel:dry": "python scripts/ingest.py --dry-run"
   },
   "dependencies": {
     "@netlify/functions": "^5.1.0",
