@@ -4,7 +4,7 @@ Ingestion pipeline for the Public Engagement Coaching Tool.
 
 Reads from "Data Tracker.xlsx" and loads chunks into Weaviate.
   - Participedia Case Studies  → section-based chunking
-  - Data for ingestion         → sliding-window chunking
+  - Data for ingestion         → Markdown heading-based when present, else sliding-window
 
 Usage:
   python scripts/ingest.py                # ingest all data
@@ -16,6 +16,7 @@ import argparse
 import os
 import re
 import sys
+import uuid
 from collections import Counter
 from pathlib import Path
 
@@ -47,8 +48,36 @@ SECTION_HEADERS = [
 
 SLIDING_WINDOW_SIZE = 1000
 SLIDING_WINDOW_OVERLAP = 200
-LONG_SECTION_MAX_CHARS = 8000  # ~2 000 tokens
+LONG_SECTION_MAX_CHARS = 8000  # ~2 000 tokens (Participedia long sections)
+DANE_MARKDOWN_MAX_CHARS = 2000  # Data for ingestion: section sub-split size (aligns with PDF chunking)
 MIN_CHUNK_CHARS = 50           # discard chunks shorter than this
+
+# Markdown heading pattern (# through ####)
+MARKDOWN_HEADING_RE = re.compile(r"^(#{1,4})\s+(.+)$")
+
+# Stable namespace for document_id (UUID5) so the same doc always gets the same ID
+DOCUMENT_ID_NAMESPACE = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+
+
+# ── Text cleanup (before chunking) ────────────────────────────────
+
+# Inline citation markers to strip: [1], [2], [12], [123], etc.
+CITATION_PATTERN = re.compile(r"\[\d+\]")
+
+# Optional: other common reference clutter (footnote refs, "see note X")
+FOOTNOTE_REF_PATTERN = re.compile(r"\[\s*note\s*\d*\s*\]", re.IGNORECASE)
+
+
+def clean_text(text):
+    """Remove citation markers like [1], [2] and normalize whitespace."""
+    if not text or not isinstance(text, str):
+        return ""
+    s = CITATION_PATTERN.sub("", text)
+    s = FOOTNOTE_REF_PATTERN.sub("", s)
+    # Collapse multiple spaces/newlines introduced by removals
+    s = re.sub(r"[ \t]+", " ", s)
+    s = re.sub(r"\n\s*\n\s*\n+", "\n\n", s)
+    return s.strip()
 
 
 # ── Weaviate connection ────────────────────────────────────────
@@ -93,12 +122,14 @@ def ensure_collection(client):
             model="text-embedding-3-small",
         ),
         properties=[
-            Property(name="content",      data_type=DataType.TEXT),
+            Property(name="content",       data_type=DataType.TEXT),
+            Property(name="document_id",   data_type=DataType.TEXT,  skip_vectorization=True),  # stable ID for all chunks of same doc (for prev/next chunk lookup)
             Property(name="doc_name",      data_type=DataType.TEXT,  skip_vectorization=True),
-            Property(name="source_label",  data_type=DataType.TEXT,  skip_vectorization=True),
+            Property(name="source_label",   data_type=DataType.TEXT,  skip_vectorization=True),
             Property(name="source_url",    data_type=DataType.TEXT,  skip_vectorization=True),
             Property(name="doc_type",      data_type=DataType.TEXT,  skip_vectorization=True),
-            Property(name="section_name",  data_type=DataType.TEXT,  skip_vectorization=True),
+            Property(name="content_type",   data_type=DataType.TEXT,  skip_vectorization=True),  # case_study | transcript | blog_post | journal_article | report | guide | policy_brief | lecture | tool_or_resource | other
+            Property(name="section_name",   data_type=DataType.TEXT,  skip_vectorization=True),
             Property(name="chunk_index",   data_type=DataType.INT,   skip_vectorization=True),
             Property(name="total_chunks",  data_type=DataType.INT,   skip_vectorization=True),
             Property(name="doc_date",      data_type=DataType.TEXT,  skip_vectorization=True),
@@ -178,8 +209,8 @@ def _split_long_section(section_name, text, max_chars=LONG_SECTION_MAX_CHARS):
 
 def chunk_participedia(row):
     """Split one Participedia case into section-level chunks."""
-    body = str(row.get("Body", ""))
-    if len(body.strip()) < 100:
+    body = clean_text(str(row.get("Body", "")))
+    if len(body) < 100:
         return []
 
     doc_name = str(row.get("Name", ""))
@@ -209,7 +240,7 @@ def chunk_participedia(row):
         raw_sections.append((current_section, current_text.strip()))
 
     if not raw_sections:
-        raw_sections = [("Full Body", body.strip())]
+        raw_sections = [("Full Body", body)]
 
     # Prepend the section header into the chunk content (gives the
     # embedding model semantic context about what kind of text follows),
@@ -222,13 +253,20 @@ def chunk_participedia(row):
     # Filter out tiny chunks (empty sections, stray whitespace)
     expanded = [(s, t) for s, t in expanded if len(t) >= MIN_CHUNK_CHARS]
 
+    doc_id = uuid.uuid5(
+        DOCUMENT_ID_NAMESPACE,
+        f"participedia|{doc_name}|{source_url}",
+    ).hex
+
     return [
         {
             "content": text,
+            "document_id": doc_id,
             "doc_name": doc_name,
             "source_label": "Participedia Case Studies",
             "source_url": source_url,
             "doc_type": "participedia_case",
+            "content_type": "case_study",
             "section_name": section,
             "chunk_index": i,
             "total_chunks": len(expanded),
@@ -238,7 +276,60 @@ def chunk_participedia(row):
     ]
 
 
-# ── Data for ingestion: sliding-window chunking ───────────────
+# ── Data for ingestion: Markdown section or sliding-window ─────
+
+def _parse_markdown_sections(text):
+    """Parse Markdown into sections by #–#### headings. Returns list of (title, content)."""
+    if not text or not text.strip():
+        return []
+    lines = text.split("\n")
+    sections = []
+    current_title = ""
+    current_lines = []
+
+    for line in lines:
+        match = MARKDOWN_HEADING_RE.match(line)
+        if match:
+            if current_lines or current_title:
+                content = "\n".join(current_lines).strip()
+                if content or current_title:
+                    sections.append((current_title, content))
+            current_title = match.group(2).strip()
+            current_lines = []
+        else:
+            current_lines.append(line)
+
+    if current_lines or current_title:
+        content = "\n".join(current_lines).strip()
+        if content or current_title:
+            sections.append((current_title, content))
+
+    return sections
+
+
+def _chunk_dane_by_markdown(content, max_chars=DANE_MARKDOWN_MAX_CHARS):
+    """
+    Chunk content by Markdown headings. Returns list of (section_name, content) or
+    empty list if no headings found (caller should fall back to sliding window).
+    """
+    sections = _parse_markdown_sections(content)
+    if not sections:
+        return []
+    # Use section-based chunking only if we have real structure: multiple sections
+    # or a single section that had a heading (title non-empty)
+    use_sections = len(sections) > 1 or (len(sections) == 1 and sections[0][0].strip())
+    if not use_sections:
+        return []
+
+    expanded = []
+    for title, text in sections:
+        section_name = title if title else "Content"
+        with_header = f"{section_name}\n\n{text}" if title else text
+        expanded.extend(
+            _split_long_section(section_name, with_header, max_chars=max_chars)
+        )
+    return [(s, t) for s, t in expanded if len(t) >= MIN_CHUNK_CHARS]
+
 
 def _sliding_window(text, size=SLIDING_WINDOW_SIZE, overlap=SLIDING_WINDOW_OVERLAP):
     """Character-level sliding window with sentence-boundary snapping.
@@ -273,6 +364,48 @@ def _sliding_window(text, size=SLIDING_WINDOW_SIZE, overlap=SLIDING_WINDOW_OVERL
     return chunks
 
 
+# Content-type taxonomy for retrieval and display (source label to user).
+# One of: case_study, transcript, blog_post, journal_article, report, guide,
+# policy_brief, lecture, tool_or_resource, other.
+CONTENT_TYPES = (
+    "case_study",
+    "transcript",
+    "blog_post",
+    "journal_article",
+    "report",
+    "guide",
+    "policy_brief",
+    "lecture",
+    "tool_or_resource",
+    "other",
+)
+
+# Rules (source, name) -> content_type. First match wins. Pass (source_lower, name_lower).
+_CONTENT_TYPE_RULES = [
+    (lambda s, n: "transcript" in s or "transcript" in n, "transcript"),
+    (lambda s, n: "lecture" in s or "lecture" in n, "lecture"),
+    (lambda s, n: "journal" in s or "journal" in n or "academic" in s or "academic" in n, "journal_article"),
+    (lambda s, n: "blog" in s or "blog" in n, "blog_post"),
+    (lambda s, n: "report" in s or "report" in n or "white paper" in s or "white paper" in n or "whitepaper" in s or "whitepaper" in n, "report"),
+    (lambda s, n: "guide" in s or "guide" in n or "handbook" in s or "handbook" in n or "how-to" in s or "how-to" in n, "guide"),
+    (lambda s, n: "popvox" in s or "democracynext" in s or "policy brief" in s or "policy brief" in n, "policy_brief"),
+    (lambda s, n: "govlab" in s, "report"),
+    (lambda s, n: "reboot" in s or "reboot" in n, "blog_post"),
+    (lambda s, n: "case study" in s or "case study" in n or "case studies" in s or "case studies" in n, "case_study"),
+    (lambda s, n: "tool" in s or "tool" in n or "resource" in s or "resource" in n, "tool_or_resource"),
+]
+
+
+def _classify_content_type(source, name):
+    """Classify document for retrieval and display. Returns one of CONTENT_TYPES."""
+    s = str(source).lower()
+    n = str(name).lower()
+    for predicate, ctype in _CONTENT_TYPE_RULES:
+        if predicate(s, n):
+            return ctype
+    return "other"
+
+
 _DOC_TYPE_RULES = [
     (lambda s: "filtered reboot" in s, "reboot_democracy"),
     (lambda s: "govlab" in s,          "govlab_resource"),
@@ -294,25 +427,57 @@ def _classify_doc_type(source):
 
 
 def chunk_dane(row):
-    """Sliding-window chunk one row from the 'Data for ingestion' sheet."""
-    content = str(row.get("Content", ""))
-    if len(content.strip()) < 50:
+    """
+    Chunk one row from the 'Data for ingestion' sheet.
+    Prefer Markdown heading-based sections when present; fall back to sliding-window.
+    """
+    content = clean_text(str(row.get("Content", "")))
+    if len(content) < 50:
         return []
 
     doc_name = str(row.get("Name", ""))
     source = str(row.get("Source", ""))
     source_url = str(row.get("Link", ""))
     doc_type = _classify_doc_type(source)
+    content_type = _classify_content_type(source, doc_name)
 
+    doc_id = uuid.uuid5(
+        DOCUMENT_ID_NAMESPACE,
+        f"dane|{source}|{doc_name}|{source_url}",
+    ).hex
+
+    # Prefer section-based chunking when content has Markdown headings
+    section_chunks = _chunk_dane_by_markdown(content)
+    if section_chunks:
+        chunks_with_meta = [
+            {
+                "content": text,
+                "document_id": doc_id,
+                "doc_name": doc_name,
+                "source_label": source,
+                "source_url": source_url,
+                "doc_type": doc_type,
+                "content_type": content_type,
+                "section_name": section,
+                "chunk_index": i,
+                "total_chunks": len(section_chunks),
+                "doc_date": "",
+            }
+            for i, (section, text) in enumerate(section_chunks)
+        ]
+        return chunks_with_meta
+
+    # Fallback: sliding-window for plain or unstructured content
     windows = _sliding_window(content)
-
     return [
         {
             "content": chunk,
+            "document_id": doc_id,
             "doc_name": doc_name,
             "source_label": source,
             "source_url": source_url,
             "doc_type": doc_type,
+            "content_type": content_type,
             "section_name": f"chunk_{i + 1}_of_{len(windows)}",
             "chunk_index": i,
             "total_chunks": len(windows),
@@ -360,8 +525,12 @@ def print_stats(chunks):
     print("\n── Chunk Statistics ──")
     types = Counter(c["doc_type"] for c in chunks)
     for dtype, count in sorted(types.items(), key=lambda x: -x[1]):
-        print(f"   {dtype:25s} {count:>6,}")
+        print(f"   doc_type {dtype:22s} {count:>6,}")
     print(f"   {'TOTAL':25s} {len(chunks):>6,}")
+    content_types = Counter(c["content_type"] for c in chunks)
+    print("\n   content_type (for retrieval/display):")
+    for ctype, count in sorted(content_types.items(), key=lambda x: -x[1]):
+        print(f"     {ctype:22s} {count:>6,}")
 
     lengths = [len(c["content"]) for c in chunks]
     sorted_lens = sorted(lengths)

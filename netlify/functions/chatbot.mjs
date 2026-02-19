@@ -51,14 +51,24 @@ const COLLECTION_NAME = 'CoachingTool';
 const MAX_RESULTS = parseInt(process.env.CHATBOT_MAX_RESULTS, 10) || 5;
 const MODEL = process.env.CHATBOT_MODEL || 'gpt-5.2';
 
+// Request both Excel-ingest (doc_name, section_name, chunk_index, total_chunks, document_id)
+// and PDF-ingest (sourceFile, title, sectionPath, chunkIndex) fields for compatibility.
 const CHUNK_FIELDS = `
+  content
+  document_id
+  doc_name
+  source_label
+  source_url
+  content_type
+  section_name
+  chunk_index
+  total_chunks
   objectId
   sourceFile
   title
   chapterTitle
   sectionPath
   contextPrefix
-  content
   chunkIndex
   _additional { id score }
 `;
@@ -107,7 +117,23 @@ async function searchContent(query) {
 }
 
 // ──── Format utilities ───────────────────────────────────────
-// Adapted from chatbot_reboot.mjs formatSearchResults()
+// content_type (snake_case) -> display label for user
+const CONTENT_TYPE_LABELS = {
+  case_study: 'Case study',
+  transcript: 'Transcript',
+  blog_post: 'Blog post',
+  journal_article: 'Journal article',
+  report: 'Report',
+  guide: 'Guide',
+  policy_brief: 'Policy brief',
+  lecture: 'Lecture',
+  tool_or_resource: 'Tool or resource',
+  other: 'Other',
+};
+
+function contentTypeLabel(ctype) {
+  return (ctype && CONTENT_TYPE_LABELS[ctype]) || CONTENT_TYPE_LABELS.other || 'Other';
+}
 
 function formatSearchResults(results) {
   if (!results?.length) {
@@ -116,11 +142,22 @@ function formatSearchResults(results) {
 
   return results
     .map((r) => {
-      const docTitle = r.title || 'Untitled';
-      const section = r.sectionPath || r.chapterTitle || '';
+      const docTitle = r.doc_name || r.title || 'Untitled';
+      const section = r.section_name || r.sectionPath || r.chapterTitle || '';
+      const chunkIdx = r.chunk_index ?? r.chunkIndex;
+      const totalChunks = r.total_chunks;
+      const position =
+        totalChunks != null && chunkIdx != null
+          ? ` (chunk ${chunkIdx + 1} of ${totalChunks})`
+          : chunkIdx != null
+            ? ` (chunk ${chunkIdx + 1})`
+            : '';
+      const source = r.source_label || r.sourceFile || 'unknown';
+      const typeLabel = r.content_type ? contentTypeLabel(r.content_type) : '';
+      const sourceInfo = typeLabel ? `${source} · ${typeLabel}` : source;
       const header = section
-        ? `**${docTitle}** — _${section}_ (source: ${r.sourceFile || 'unknown'})`
-        : `**${docTitle}** (source: ${r.sourceFile || 'unknown'}, chunk ${r.chunkIndex ?? '?'})`;
+        ? `**${docTitle}** — _${section}_${position} (source: ${sourceInfo})`
+        : `**${docTitle}**${position} (source: ${sourceInfo})`;
       return `${header}\n${r.content || ''}`;
     })
     .join('\n\n---\n\n');
@@ -209,25 +246,37 @@ Instructions:
       }
     }
 
-    // ── 4. Append source documents ──────────────────────────
+    // ── 4. Append source documents ─────────────────────────────────
+    // Each item includes documentId, chunkIndex, totalChunks so the client can
+    // fetch adjacent chunks: e.g. previous = Weaviate filter
+    //   { operator: 'And', operands: [
+    //     { path: ['document_id'], operator: 'Equal', valueText: hit.documentId },
+    //     { path: ['chunk_index'], operator: 'Equal', valueInt: hit.chunkIndex - 1 }
+    //   ] }
     const sourceDocuments = searchResults
       .map((r) => {
-        const section = r.sectionPath || r.chapterTitle || '';
+        const section = r.section_name || r.sectionPath || r.chapterTitle || '';
+        const docTitle = r.doc_name || r.title || r.sourceFile || 'Unknown';
         return {
-          title: section
-            ? `${r.title || r.sourceFile} — ${section}`
-            : r.title || r.sourceFile || 'Unknown',
-          sourceFile: r.sourceFile || '',
+          title: section ? `${docTitle} — ${section}` : docTitle,
+          sourceFile: r.source_label ?? r.sourceFile ?? '',
+          sourceUrl: r.source_url ?? '',
+          contentType: r.content_type ?? null,
+          contentTypeLabel: r.content_type ? contentTypeLabel(r.content_type) : null,
           sectionPath: section,
-          chapterTitle: r.chapterTitle || '',
-          chunkIndex: r.chunkIndex ?? null,
+          chapterTitle: r.chapterTitle ?? '',
+          chunkIndex: r.chunk_index ?? r.chunkIndex ?? null,
+          totalChunks: r.total_chunks ?? null,
+          documentId: r.document_id ?? null,
         };
       })
-      // Deduplicate by sourceFile + sectionPath
+      // Deduplicate by document_id + chunk_index (or sourceFile + sectionPath for PDF-only)
       .filter(
         (doc, i, arr) =>
           arr.findIndex(
-            (d) => d.sourceFile === doc.sourceFile && d.sectionPath === doc.sectionPath
+            (d) =>
+              (doc.documentId != null && d.documentId === doc.documentId && d.chunkIndex === doc.chunkIndex) ||
+              (doc.documentId == null && d.sourceFile === doc.sourceFile && d.sectionPath === doc.sectionPath)
           ) === i
       );
 
