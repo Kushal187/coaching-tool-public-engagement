@@ -16,7 +16,7 @@ import { Link } from 'react-router';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
-import { caseStudies, type CaseStudy } from '../data/caseStudies';
+import type { CaseStudy } from '../data/caseStudies';
 
 /* ── Question definitions ── */
 
@@ -251,7 +251,6 @@ function generatePlan(ctx: UserContext): string {
     plan += `> ${ctx.existingWork}\n\n`;
   }
 
-  /* Phase 1 */
   plan += `### Phase 1: ${isMidway ? 'Assessment & Realignment' : 'Preparation & Design'}\n\n`;
 
   if (isMidway) {
@@ -266,7 +265,6 @@ function generatePlan(ctx: UserContext): string {
     plan += `- Develop a communication plan to recruit and inform participants\n`;
   }
 
-  /* Audience-specific guidance */
   if (ctx.audience.includes('Hard-to-reach or historically underrepresented communities')) {
     plan += `- Partner with trusted community organizations for culturally appropriate outreach\n`;
     plan += `- Provide multiple participation channels (in-person, online, paper, phone)\n`;
@@ -281,10 +279,8 @@ function generatePlan(ctx: UserContext): string {
     plan += `- Create clear decision-making protocols so staff know how input will be used\n`;
   }
 
-  /* Phase 2 */
   plan += `\n### Phase 2: Engagement Implementation\n\n`;
 
-  /* Constraint-aware recommendations */
   if (ctx.biggestConstraint.includes('Time')) {
     plan += `- Focus on rapid, high-impact methods: online surveys, pop-up events, social media polls\n`;
     plan += `- Use existing gatherings (community meetings, events) to embed engagement\n`;
@@ -312,7 +308,6 @@ function generatePlan(ctx: UserContext): string {
     plan += `- Budget time for staff training or bring in a technical partner\n`;
   }
 
-  /* Goal-specific methods */
   if (ctx.primaryGoal.includes('Discover what people care about')) {
     plan += `- Use open-ended methods: listening sessions, story circles, community walks\n`;
     plan += `- Deploy broad-reach tools like surveys and social media to surface themes\n`;
@@ -330,7 +325,6 @@ function generatePlan(ctx: UserContext): string {
   plan += `- Create regular feedback loops showing participants how input shapes outcomes\n`;
   plan += `- Maintain consistent and transparent communication throughout\n`;
 
-  /* Phase 3 */
   plan += `\n### Phase 3: Synthesis & Closing the Loop\n\n`;
 
   if (ctx.stuckPoint.includes('Making sense of the input')) {
@@ -354,7 +348,6 @@ function generatePlan(ctx: UserContext): string {
   plan += `- Document lessons learned for future engagement initiatives\n`;
   plan += `- Establish ongoing communication channels for continued community dialogue\n`;
 
-  /* AI guidance */
   plan += `\n### AI Integration Guidance\n\n`;
   if (ctx.aiComfort.includes('haven\'t used AI')) {
     plan += `- Start simple: use AI to help draft plain-language summaries of technical documents\n`;
@@ -371,7 +364,6 @@ function generatePlan(ctx: UserContext): string {
     plan += `- Maintain transparency: always disclose when AI is part of the process\n`;
   }
 
-  /* Success criteria */
   plan += `\n### Measuring Success\n\n`;
   plan += `Your stated definition of success: *${ctx.successLooksLike}*\n\n`;
   plan += `Suggested metrics to track:\n`;
@@ -388,24 +380,27 @@ function generatePlan(ctx: UserContext): string {
 
 function scoreCaseStudy(cs: CaseStudy, ctx: UserContext): number {
   let score = 0;
+  const tagsLower = cs.tags.map((t) => t.toLowerCase());
 
-  if (ctx.biggestConstraint.includes('Budget') && cs.relevanceFactors.budgetLevel === 'low') score += 3;
-  if (ctx.biggestConstraint.includes('Time') && cs.sizeCategory === 'small') score += 2;
-  if (ctx.audience.includes('Hard-to-reach or historically underrepresented communities') && cs.relevanceFactors.ruralFocus) score += 3;
-  if (ctx.audience.includes('A specific demographic group (youth, seniors, immigrants, etc.)') && cs.relevanceFactors.youthFocus) score += 3;
-  if (ctx.issueArea.includes('Policy') && cs.relevanceFactors.policyFocus) score += 2;
-  if (ctx.issueArea.includes('Community planning') && cs.relevanceFactors.policyFocus) score += 2;
-  if (ctx.resources.includes('Very limited') && cs.relevanceFactors.budgetLevel === 'low') score += 2;
-  if (ctx.primaryGoal.includes('Co-create') && cs.tags.includes('Co-Design')) score += 3;
-  if (ctx.primaryGoal.includes('deliberate') && cs.tags.includes('Deliberative Democracy')) score += 3;
+  if (ctx.primaryGoal.includes('Co-create') && tagsLower.some((t) => t.includes('co-design') || t.includes('co-create'))) score += 3;
+  if (ctx.primaryGoal.includes('deliberate') && tagsLower.some((t) => t.includes('deliberat'))) score += 3;
+  if (ctx.issueArea.includes('Policy') && tagsLower.some((t) => t.includes('policy'))) score += 2;
+  if (ctx.issueArea.includes('Community planning') && tagsLower.some((t) => t.includes('planning') || t.includes('urban'))) score += 2;
+
+  if (ctx.biggestConstraint.includes('Budget') && cs.scale === 'small') score += 3;
+  if (ctx.biggestConstraint.includes('Time') && cs.scale === 'small') score += 2;
+  if (ctx.resources.includes('Very limited') && cs.scale === 'small') score += 2;
 
   const timelineShort = ctx.timeline.includes('4 weeks') || ctx.timeline.includes('1–3');
   const timelineLong = ctx.timeline.includes('6–12') || ctx.timeline.includes('No fixed');
-  if (timelineShort && cs.sizeCategory === 'small') score += 2;
-  if (timelineLong && cs.sizeCategory === 'large') score += 2;
+  if (timelineShort && cs.scale === 'small') score += 2;
+  if (timelineLong && cs.scale === 'large') score += 2;
 
-  if (ctx.stuckPoint.includes('Reaching the right people') && cs.relevanceFactors.ruralFocus) score += 2;
-  if (ctx.stuckPoint.includes('engagement method') && cs.tags.includes('Hybrid Engagement')) score += 2;
+  const demoLower = cs.demographic.toLowerCase();
+  if (ctx.audience.includes('Hard-to-reach or historically underrepresented communities') && (demoLower.includes('rural') || demoLower.includes('underserved') || demoLower.includes('remote'))) score += 3;
+  if (ctx.audience.includes('A specific demographic group (youth, seniors, immigrants, etc.)') && (demoLower.includes('youth') || demoLower.includes('senior') || demoLower.includes('immigrant'))) score += 3;
+  if (ctx.stuckPoint.includes('Reaching the right people') && (demoLower.includes('rural') || demoLower.includes('underserved'))) score += 2;
+  if (ctx.stuckPoint.includes('engagement method') && tagsLower.some((t) => t.includes('hybrid'))) score += 2;
 
   score += Math.random() * 1.5;
   return score;
@@ -422,11 +417,19 @@ export function Coach() {
   const [recommendedStudies, setRecommendedStudies] = useState<
     { study: CaseStudy; score: number }[]
   >([]);
+  const [allCaseStudies, setAllCaseStudies] = useState<CaseStudy[]>([]);
   const [followUpQuestions, setFollowUpQuestions] = useState<FollowUpQuestion[]>([]);
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [planLoading, setPlanLoading] = useState(false);
   const [planSources, setPlanSources] = useState<SourceDoc[]>([]);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch('/.netlify/functions/case-studies')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: CaseStudy[]) => setAllCaseStudies(data))
+      .catch(() => setAllCaseStudies([]));
+  }, []);
 
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -445,8 +448,8 @@ export function Coach() {
     setEditablePlan('');
     setPlanSources([]);
 
-    const scored = caseStudies
-      .map((cs) => ({ study: cs, score: scoreCaseStudy(cs, ctx) }))
+    const scored = allCaseStudies
+      .map((cs) => ({ study: cs, score: scoreCaseStudy(cs, context) }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
     setRecommendedStudies(scored);
@@ -475,7 +478,7 @@ export function Coach() {
         try {
           const parsed = JSON.parse(data);
           if (parsed.content) planContent += parsed.content;
-          if (parsed.sourceDocuments) setPlanSources(parsed.sourceDocuments);
+          if (parsed.sources) setPlanSources(parsed.sources);
         } catch { /* skip malformed */ }
       }
 
@@ -489,7 +492,7 @@ export function Coach() {
     } finally {
       setPlanLoading(false);
     }
-  }, [ctx]);
+  }, [allCaseStudies]);
 
   const goTo = (phase: CoachingPhase) => {
     if (phase === 'plan-output') {
@@ -552,7 +555,6 @@ export function Coach() {
     goTo('plan-output');
   };
 
-  /* After Q10, decide the path */
   const handleProcessStageSelect = (option: string) => {
     setCtx((prev) => ({ ...prev, processStage: option }));
     if (FRESH_STAGES.has(option)) {
@@ -897,8 +899,17 @@ export function Coach() {
                 <button
                   onClick={() => {
                     setCtx((prev) => ({ ...prev, midwayChoice: 'qa' }));
-                    alert(
-                      'This will open the Q&A chatbot with your context pre-loaded. (Backend not connected yet — placeholder.)'
+                    const issue = ctx.issueArea === 'Other' ? ctx.issueAreaOther : ctx.issueArea;
+                    const contextMessage =
+                      `I've loaded your coaching session context so I can give you targeted advice.\n\n` +
+                      `**Your situation:** ${issue} engagement, focused on *${ctx.primaryGoal.toLowerCase()}*, ` +
+                      `targeting ${ctx.audience.join('; ')}.\n` +
+                      `**Timeline:** ${ctx.timeline} | **Constraint:** ${ctx.biggestConstraint}\n` +
+                      `**Current stage:** ${ctx.processStage}\n` +
+                      (ctx.existingWork ? `**Existing work:** ${ctx.existingWork}\n` : '') +
+                      `\nAsk me anything about your engagement — methods, challenges, next steps, or specific advice.`;
+                    window.dispatchEvent(
+                      new CustomEvent('open-chatbot', { detail: { contextMessage } }),
                     );
                   }}
                   className="w-full text-left p-6 border border-gray-200 rounded-lg hover:border-gray-900 hover:shadow-md transition-all group cursor-pointer"
@@ -1092,7 +1103,9 @@ export function Coach() {
                                   <span>&bull;</span>
                                   <span>{study.timeframe}</span>
                                   <span>&bull;</span>
-                                  <span>{study.size}</span>
+                                  <span className="capitalize">
+                                    {study.scale} scale
+                                  </span>
                                 </div>
                                 <div className="flex gap-1.5 mt-2">
                                   {study.tags.map((tag) => (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router';
 import {
   ArrowLeft,
@@ -17,7 +17,7 @@ import {
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
-import { caseStudies } from '../data/caseStudies';
+import type { CaseStudy } from '../data/caseStudies';
 
 type AdaptStep = 'info' | 'context' | 'constraints' | 'output';
 
@@ -27,57 +27,11 @@ type SourceDoc = {
   contentTypeLabel: string | null;
 };
 
-function generateAdaptedPlanFallback(
-  caseStudy: (typeof caseStudies)[0],
-  context: string,
-  constraints: string,
-): string {
-  let plan = '';
-  plan += `## Adapted Plan: Based on ${caseStudy.title}\n\n`;
-  plan += `**Your Context:** ${context}\n`;
-  plan += `**Your Constraints:** ${constraints}\n`;
-  plan += `**Reference Case Study:** ${caseStudy.title} (${caseStudy.location})\n\n`;
-  plan += `### Adapted Approach\n\n`;
-  plan += `Drawing from the ${caseStudy.title} model, here is a plan adapted to your situation:\n\n`;
-
-  plan += `### Phase 1: Setup (Adapted from ${caseStudy.location} approach)\n\n`;
-  caseStudy.implementationSteps.slice(0, 2).forEach((step) => {
-    plan += `- ${step}\n`;
-  });
-  plan += `- Adapt these steps to your specific context: ${context.slice(0, 80)}...\n`;
-
-  plan += `\n### Phase 2: Implementation\n\n`;
-  caseStudy.implementationSteps.slice(2).forEach((step) => {
-    plan += `- ${step}\n`;
-  });
-
-  const constraintsLower = constraints.toLowerCase();
-  if (
-    constraintsLower.includes('budget') ||
-    constraintsLower.includes('limited') ||
-    constraintsLower.includes('resource')
-  ) {
-    plan += `- Focus on low-cost, high-impact activities first\n`;
-    plan += `- Leverage volunteer networks and existing community infrastructure\n`;
-  }
-
-  plan += `\n### Phase 3: Evaluation & Outcomes\n\n`;
-  plan += `Target outcomes modeled on the original case study:\n`;
-  caseStudy.keyOutcomes.forEach((outcome) => {
-    plan += `- ${outcome}\n`;
-  });
-
-  plan += `\n### Key Adaptations for Your Context\n\n`;
-  plan += `- Modified for your constraints: ${constraints}\n`;
-  plan += `- Timeline and scale adjusted based on your situation\n`;
-  plan += `- Core principles preserved from the ${caseStudy.title} model\n`;
-
-  return plan;
-}
-
 export function CaseStudyDetail() {
   const { caseStudyId } = useParams();
-  const caseStudy = caseStudies.find((cs) => cs.id === caseStudyId);
+  const [caseStudy, setCaseStudy] = useState<CaseStudy | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [adaptStep, setAdaptStep] = useState<AdaptStep>('info');
   const [adaptContext, setAdaptContext] = useState('');
@@ -87,11 +41,50 @@ export function CaseStudyDetail() {
   const [editablePlan, setEditablePlan] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [sources, setSources] = useState<SourceDoc[]>([]);
+  const [showFullContent, setShowFullContent] = useState(false);
 
-  if (!caseStudy) {
+  useEffect(() => {
+    if (!caseStudyId) return;
+    setLoading(true);
+    setFetchError(null);
+
+    fetch(`/.netlify/functions/case-studies?id=${encodeURIComponent(caseStudyId)}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Not found (${res.status})`);
+        return res.json();
+      })
+      .then((data: CaseStudy) => setCaseStudy(data))
+      .catch((err) => {
+        console.error('Failed to fetch case study:', err);
+        setFetchError(err.message || 'Failed to load case study.');
+      })
+      .finally(() => setLoading(false));
+  }, [caseStudyId]);
+
+  if (loading) {
+    return (
+      <div className="max-w-5xl mx-auto px-6 py-8">
+        <Link
+          to="/case-studies"
+          className="inline-flex items-center gap-2 text-gray-700 hover:text-gray-900 mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Case Studies
+        </Link>
+        <div className="flex flex-col items-center justify-center py-24 space-y-4">
+          <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+          <p className="text-gray-500 font-medium">Loading case study…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (fetchError || !caseStudy) {
     return (
       <div className="max-w-4xl mx-auto px-6 py-8">
-        <p className="text-gray-600">Case study not found.</p>
+        <p className="text-gray-600">
+          {fetchError || 'Case study not found.'}
+        </p>
         <Link to="/case-studies" className="text-gray-900 underline">
           Back to Case Studies
         </Link>
@@ -119,10 +112,10 @@ export function CaseStudyDetail() {
             title: caseStudy.title,
             location: caseStudy.location,
             timeframe: caseStudy.timeframe,
-            size: caseStudy.size,
+            size: caseStudy.scale,
             demographic: caseStudy.demographic,
             tags: caseStudy.tags,
-            description: caseStudy.description,
+            description: caseStudy.summary,
             keyOutcomes: caseStudy.keyOutcomes,
             implementationSteps: caseStudy.implementationSteps,
           },
@@ -145,8 +138,10 @@ export function CaseStudyDetail() {
         try {
           const parsed = JSON.parse(data);
           if (parsed.content) planContent += parsed.content;
-          if (parsed.sourceDocuments) setSources(parsed.sourceDocuments);
-        } catch { /* skip malformed */ }
+          if (parsed.sources) setSources(parsed.sources);
+        } catch {
+          /* skip malformed */
+        }
       }
 
       setAdaptedPlan(planContent);
@@ -237,13 +232,53 @@ export function CaseStudyDetail() {
               <div className="flex items-start gap-2">
                 <Target className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-500">Size</p>
-                  <p className="text-sm text-gray-900">{caseStudy.size}</p>
+                  <p className="text-xs text-gray-500">Scale</p>
+                  <p className="text-sm text-gray-900 capitalize">
+                    {caseStudy.scale}
+                  </p>
                 </div>
               </div>
             </div>
-            <p className="text-gray-600">{caseStudy.description}</p>
+            <p className="text-gray-600">{caseStudy.summary}</p>
+
+            {caseStudy.sourceUrl && (
+              <a
+                href={caseStudy.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 mt-3 transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                View original source
+              </a>
+            )}
           </div>
+
+          {/* Full Case Study Content */}
+          {caseStudy.fullContent && (
+            <div className="mb-8 border border-gray-200 rounded-lg bg-white">
+              <button
+                onClick={() => setShowFullContent(!showFullContent)}
+                className="w-full flex items-center justify-between p-4 text-left cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900">
+                  Full Case Study Content
+                </h3>
+                {showFullContent ? (
+                  <ChevronUp className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
+              {showFullContent && (
+                <div className="px-4 pb-4">
+                  <div className="prose prose-sm max-w-none p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <SimpleMarkdownRenderer text={caseStudy.fullContent} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Adapt to My Situation Flow */}
           <div className="border border-gray-200 rounded-lg bg-white shadow-sm">
@@ -362,7 +397,8 @@ export function CaseStudyDetail() {
                         Researching and adapting the case study...
                       </p>
                       <p className="text-sm text-gray-400">
-                        Our AI is searching the knowledge base for relevant evidence
+                        Our AI is searching the knowledge base for relevant
+                        evidence
                       </p>
                     </div>
                   ) : (
@@ -395,62 +431,9 @@ export function CaseStudyDetail() {
                         />
                       ) : (
                         <div className="prose prose-sm max-w-none p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          {(editablePlan || adaptedPlan)
-                            .split('\n')
-                            .map((line, i) => {
-                              if (line.startsWith('## '))
-                                return (
-                                  <h2
-                                    key={i}
-                                    className="text-lg font-semibold text-gray-900 mt-3 mb-2"
-                                  >
-                                    {line.replace('## ', '')}
-                                  </h2>
-                                );
-                              if (line.startsWith('### '))
-                                return (
-                                  <h3
-                                    key={i}
-                                    className="text-base font-semibold text-gray-900 mt-4 mb-2"
-                                  >
-                                    {line.replace('### ', '')}
-                                  </h3>
-                                );
-                              if (line.startsWith('**'))
-                                return (
-                                  <p
-                                    key={i}
-                                    className="text-gray-700 mb-1 text-sm"
-                                  >
-                                    <strong>
-                                      {line.match(/\*\*(.*?)\*\*/)?.[1] || ''}
-                                    </strong>
-                                    {line.replace(/\*\*.*?\*\*/, '')}
-                                  </p>
-                                );
-                              if (line.startsWith('- '))
-                                return (
-                                  <div
-                                    key={i}
-                                    className="flex gap-2 text-gray-700 mb-1 ml-4 text-sm"
-                                  >
-                                    <span className="text-gray-400 flex-shrink-0">
-                                      &bull;
-                                    </span>
-                                    <span>{line.replace('- ', '')}</span>
-                                  </div>
-                                );
-                              if (line.trim() === '')
-                                return <div key={i} className="h-2" />;
-                              return (
-                                <p
-                                  key={i}
-                                  className="text-gray-700 mb-1 text-sm"
-                                >
-                                  {line}
-                                </p>
-                              );
-                            })}
+                          <SimpleMarkdownRenderer
+                            text={editablePlan || adaptedPlan}
+                          />
                         </div>
                       )}
 
@@ -535,6 +518,58 @@ export function CaseStudyDetail() {
   );
 }
 
+function SimpleMarkdownRenderer({ text }: { text: string }) {
+  return (
+    <>
+      {text.split('\n').map((line, i) => {
+        if (line.startsWith('## '))
+          return (
+            <h2
+              key={i}
+              className="text-lg font-semibold text-gray-900 mt-3 mb-2"
+            >
+              {line.replace('## ', '')}
+            </h2>
+          );
+        if (line.startsWith('### '))
+          return (
+            <h3
+              key={i}
+              className="text-base font-semibold text-gray-900 mt-4 mb-2"
+            >
+              {line.replace('### ', '')}
+            </h3>
+          );
+        if (line.startsWith('**'))
+          return (
+            <p key={i} className="text-gray-700 mb-1 text-sm">
+              <strong>
+                {line.match(/\*\*(.*?)\*\*/)?.[1] || ''}
+              </strong>
+              {line.replace(/\*\*.*?\*\*/, '')}
+            </p>
+          );
+        if (line.startsWith('- '))
+          return (
+            <div
+              key={i}
+              className="flex gap-2 text-gray-700 mb-1 ml-4 text-sm"
+            >
+              <span className="text-gray-400 flex-shrink-0">&bull;</span>
+              <span>{line.replace('- ', '')}</span>
+            </div>
+          );
+        if (line.trim() === '') return <div key={i} className="h-2" />;
+        return (
+          <p key={i} className="text-gray-700 mb-1 text-sm">
+            {line}
+          </p>
+        );
+      })}
+    </>
+  );
+}
+
 function SourceList({ sources }: { sources: SourceDoc[] }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -555,7 +590,8 @@ function SourceList({ sources }: { sources: SourceDoc[] }) {
         ) : (
           <ChevronDown className="w-4 h-4" />
         )}
-        {uniqueSources.length} source{uniqueSources.length !== 1 ? 's' : ''} referenced
+        {uniqueSources.length} source
+        {uniqueSources.length !== 1 ? 's' : ''} referenced
       </button>
       {isExpanded && (
         <div className="mt-3 space-y-2">
@@ -568,7 +604,10 @@ function SourceList({ sources }: { sources: SourceDoc[] }) {
               <span>
                 {src.title}
                 {src.contentTypeLabel && (
-                  <span className="text-gray-400"> &middot; {src.contentTypeLabel}</span>
+                  <span className="text-gray-400">
+                    {' '}
+                    &middot; {src.contentTypeLabel}
+                  </span>
                 )}
                 {src.sourceUrl && (
                   <a
@@ -587,4 +626,52 @@ function SourceList({ sources }: { sources: SourceDoc[] }) {
       )}
     </div>
   );
+}
+
+function generateAdaptedPlanFallback(
+  caseStudy: CaseStudy,
+  context: string,
+  constraints: string,
+): string {
+  let plan = '';
+  plan += `## Adapted Plan: Based on ${caseStudy.title}\n\n`;
+  plan += `**Your Context:** ${context}\n`;
+  plan += `**Your Constraints:** ${constraints}\n`;
+  plan += `**Reference Case Study:** ${caseStudy.title} (${caseStudy.location})\n\n`;
+  plan += `### Adapted Approach\n\n`;
+  plan += `Drawing from the ${caseStudy.title} model, here is a plan adapted to your situation:\n\n`;
+
+  plan += `### Phase 1: Setup (Adapted from ${caseStudy.location} approach)\n\n`;
+  caseStudy.implementationSteps.slice(0, 2).forEach((step) => {
+    plan += `- ${step}\n`;
+  });
+  plan += `- Adapt these steps to your specific context: ${context.slice(0, 80)}...\n`;
+
+  plan += `\n### Phase 2: Implementation\n\n`;
+  caseStudy.implementationSteps.slice(2).forEach((step) => {
+    plan += `- ${step}\n`;
+  });
+
+  const constraintsLower = constraints.toLowerCase();
+  if (
+    constraintsLower.includes('budget') ||
+    constraintsLower.includes('limited') ||
+    constraintsLower.includes('resource')
+  ) {
+    plan += `- Focus on low-cost, high-impact activities first\n`;
+    plan += `- Leverage volunteer networks and existing community infrastructure\n`;
+  }
+
+  plan += `\n### Phase 3: Evaluation & Outcomes\n\n`;
+  plan += `Target outcomes modeled on the original case study:\n`;
+  caseStudy.keyOutcomes.forEach((outcome) => {
+    plan += `- ${outcome}\n`;
+  });
+
+  plan += `\n### Key Adaptations for Your Context\n\n`;
+  plan += `- Modified for your constraints: ${constraints}\n`;
+  plan += `- Timeline and scale adjusted based on your situation\n`;
+  plan += `- Core principles preserved from the ${caseStudy.title} model\n`;
+
+  return plan;
 }

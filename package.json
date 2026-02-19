@@ -19,7 +19,9 @@
     "pipeline:clear": "npm run convert && npm run ingest:clear",
     "ingest:excel": "python scripts/ingest.py",
     "ingest:excel:clear": "python scripts/ingest.py --clear",
-    "ingest:excel:dry": "python scripts/ingest.py --dry-run"
+    "ingest:excel:dry": "python scripts/ingest.py --dry-run",
+    "ingest:excel:cs-only": "python scripts/ingest.py --only-case-study-library",
+    "ingest:excel:skip-cs": "python scripts/ingest.py --skip-case-study-library"
   },
   "dependencies": {
     "@netlify/functions": "^5.1.0",
