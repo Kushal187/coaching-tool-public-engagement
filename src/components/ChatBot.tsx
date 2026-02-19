@@ -49,7 +49,7 @@ async function fetchBotResponse(
       try {
         const parsed = JSON.parse(data);
         if (parsed.content) onChunk(parsed.content);
-        if (parsed.sourceDocuments) onSources(parsed.sourceDocuments);
+        if (parsed.sources) onSources(parsed.sources);
       } catch { /* skip malformed lines */ }
     }
 
@@ -74,6 +74,23 @@ export function ChatBot() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleOpenChatbot = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setIsOpen(true);
+      if (detail?.contextMessage) {
+        const contextMsg: Message = {
+          id: Date.now().toString(),
+          type: 'bot',
+          content: detail.contextMessage,
+        };
+        setMessages((prev) => [...prev, contextMsg]);
+      }
+    };
+    window.addEventListener('open-chatbot', handleOpenChatbot);
+    return () => window.removeEventListener('open-chatbot', handleOpenChatbot);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
