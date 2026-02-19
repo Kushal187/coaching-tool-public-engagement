@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "weaviate-docs": {
+      "type": "http",
+      "url": "https://weaviate-docs.mcp.kapa.ai"
+    }
+  }
+}
