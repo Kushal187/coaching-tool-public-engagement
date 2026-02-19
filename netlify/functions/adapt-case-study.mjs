@@ -19,7 +19,7 @@ import {
 } from '../../lib/sse.mjs';
 
 const MODEL = process.env.CHATBOT_MODEL || 'gpt-4.1';
-const MAX_ITERATIONS = 5;
+const MAX_ITERATIONS = 3;
 
 const SYSTEM_PROMPT = `You are an experienced public engagement practitioner helping someone adapt a real-world case study to their specific situation.
 

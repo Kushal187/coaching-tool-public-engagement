@@ -20,7 +20,7 @@ import {
 } from '../../lib/sse.mjs';
 
 const MODEL = process.env.CHATBOT_MODEL || 'gpt-4.1';
-const MAX_ITERATIONS = 6;
+const MAX_ITERATIONS = 3;
 
 const SYSTEM_PROMPT = `You are a senior public engagement consultant with deep expertise in participatory democracy, community engagement, and deliberative processes.
 

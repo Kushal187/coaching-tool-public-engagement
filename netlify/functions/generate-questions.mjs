@@ -12,7 +12,7 @@ import { runAgentLoop } from '../../lib/agent-runner.mjs';
 import { handleCors, jsonResponse, errorResponse } from '../../lib/sse.mjs';
 
 const MODEL = process.env.CHATBOT_MODEL || 'gpt-4.1';
-const MAX_ITERATIONS = 5;
+const MAX_ITERATIONS = 3;
 
 const SYSTEM_PROMPT = `You are an expert public engagement consultant reviewing a user's questionnaire responses before generating their engagement plan.
 

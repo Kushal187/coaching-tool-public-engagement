@@ -17,7 +17,7 @@ import {
 } from '../../lib/sse.mjs';
 
 const MODEL = process.env.CHATBOT_MODEL || 'gpt-4.1';
-const MAX_ITERATIONS = 5;
+const MAX_ITERATIONS = 3;
 
 const SYSTEM_PROMPT = `You are a knowledgeable public engagement assistant with access to a curated knowledge base of documents about participatory democracy, community engagement, and deliberative processes.
 
