@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   RefreshCw,
   ArrowRight,
@@ -7,6 +7,10 @@ import {
   Download,
   BookOpen,
   Check,
+  Loader2,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Link } from 'react-router';
 import { Button } from './ui/button';
@@ -122,38 +126,66 @@ type CoachingPhase =
   | 'q10-process'
   | 'midway-existing-work'
   | 'midway-branch'
+  | 'followup'
   | 'plan-output';
+
+type FollowUpQuestion = {
+  id: string;
+  question: string;
+  why: string;
+  source: string | null;
+};
+
+type SourceDoc = {
+  title: string;
+  sourceUrl: string;
+  contentTypeLabel: string | null;
+};
 
 type UserContext = {
   issueArea: string;
   issueAreaOther: string;
   primaryGoal: string;
+  primaryGoalOther: string;
   audience: string[];
+  audienceOther: string;
   timeline: string;
   resources: string[];
+  resourcesOther: string;
   biggestConstraint: string;
+  biggestConstraintOther: string;
   aiComfort: string;
   successLooksLike: string;
+  successOther: string;
   stuckPoint: string;
+  stuckPointOther: string;
   processStage: string;
   existingWork: string;
   midwayChoice: 'plan' | 'qa' | null;
+  followUpAnswers: Record<string, string>;
 };
 
 const INITIAL_CONTEXT: UserContext = {
   issueArea: '',
   issueAreaOther: '',
   primaryGoal: '',
+  primaryGoalOther: '',
   audience: [],
+  audienceOther: '',
   timeline: '',
   resources: [],
+  resourcesOther: '',
   biggestConstraint: '',
+  biggestConstraintOther: '',
   aiComfort: '',
   successLooksLike: '',
+  successOther: '',
   stuckPoint: '',
+  stuckPointOther: '',
   processStage: '',
   existingWork: '',
   midwayChoice: null,
+  followUpAnswers: {},
 };
 
 const BASE_PHASES: CoachingPhase[] = [
@@ -172,9 +204,9 @@ const BASE_PHASES: CoachingPhase[] = [
 function getPhases(ctx: UserContext): CoachingPhase[] {
   const isFresh = FRESH_STAGES.has(ctx.processStage);
   if (ctx.processStage && !isFresh) {
-    return [...BASE_PHASES, 'midway-existing-work', 'midway-branch', 'plan-output'];
+    return [...BASE_PHASES, 'midway-existing-work', 'midway-branch', 'followup', 'plan-output'];
   }
-  return [...BASE_PHASES, 'plan-output'];
+  return [...BASE_PHASES, 'followup', 'plan-output'];
 }
 
 function getPhaseLabel(phase: CoachingPhase): string {
@@ -191,6 +223,7 @@ function getPhaseLabel(phase: CoachingPhase): string {
     'q10-process': 'Process Stage',
     'midway-existing-work': 'Existing Work',
     'midway-branch': 'Next Step',
+    'followup': 'Follow-up',
     'plan-output': 'Your Plan',
   };
   return labels[phase];
@@ -389,6 +422,10 @@ export function Coach() {
   const [recommendedStudies, setRecommendedStudies] = useState<
     { study: CaseStudy; score: number }[]
   >([]);
+  const [followUpQuestions, setFollowUpQuestions] = useState<FollowUpQuestion[]>([]);
+  const [followUpLoading, setFollowUpLoading] = useState(false);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planSources, setPlanSources] = useState<SourceDoc[]>([]);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -402,16 +439,61 @@ export function Coach() {
       ? 100
       : Math.round(((currentIdx + 1) / phases.length) * 100);
 
+  const fetchPlan = useCallback(async (context: UserContext) => {
+    setPlanLoading(true);
+    setGeneratedPlan('');
+    setEditablePlan('');
+    setPlanSources([]);
+
+    const scored = caseStudies
+      .map((cs) => ({ study: cs, score: scoreCaseStudy(cs, ctx) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+    setRecommendedStudies(scored);
+
+    try {
+      const res = await fetch('/.netlify/functions/generate-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userContext: context,
+          followUpAnswers: context.followUpAnswers,
+        }),
+      });
+
+      if (!res.ok) throw new Error('API request failed');
+
+      const text = await res.text();
+      const lines = text.split('\n');
+      let planContent = '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') break;
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.content) planContent += parsed.content;
+          if (parsed.sourceDocuments) setPlanSources(parsed.sourceDocuments);
+        } catch { /* skip malformed */ }
+      }
+
+      setGeneratedPlan(planContent);
+      setEditablePlan(planContent);
+    } catch (err) {
+      console.error('Agentic plan generation failed, using fallback:', err);
+      const fallback = generatePlan(context);
+      setGeneratedPlan(fallback);
+      setEditablePlan(fallback);
+    } finally {
+      setPlanLoading(false);
+    }
+  }, [ctx]);
+
   const goTo = (phase: CoachingPhase) => {
     if (phase === 'plan-output') {
-      const plan = generatePlan(ctx);
-      setGeneratedPlan(plan);
-      setEditablePlan(plan);
-      const scored = caseStudies
-        .map((cs) => ({ study: cs, score: scoreCaseStudy(cs, ctx) }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 5);
-      setRecommendedStudies(scored);
+      fetchPlan(ctx);
     }
     setCurrentPhase(phase);
   };
@@ -427,6 +509,10 @@ export function Coach() {
     setEditablePlan('');
     setRecommendedStudies([]);
     setIsEditing(false);
+    setFollowUpQuestions([]);
+    setFollowUpLoading(false);
+    setPlanLoading(false);
+    setPlanSources([]);
   };
 
   const handleDownload = () => {
@@ -442,11 +528,39 @@ export function Coach() {
     URL.revokeObjectURL(url);
   };
 
+  const fetchFollowUpQuestions = async (context: UserContext) => {
+    setFollowUpLoading(true);
+    setFollowUpQuestions([]);
+    try {
+      const res = await fetch('/.netlify/functions/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(context),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.needsFollowUp && data.questions?.length > 0) {
+          setFollowUpQuestions(data.questions);
+          setFollowUpLoading(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Follow-up question generation failed:', err);
+    }
+    setFollowUpLoading(false);
+    goTo('plan-output');
+  };
+
   /* After Q10, decide the path */
   const handleProcessStageSelect = (option: string) => {
     setCtx((prev) => ({ ...prev, processStage: option }));
     if (FRESH_STAGES.has(option)) {
-      setTimeout(() => goTo('plan-output'), 200);
+      const updatedCtx = { ...ctx, processStage: option };
+      setTimeout(() => {
+        setCurrentPhase('followup');
+        fetchFollowUpQuestions(updatedCtx);
+      }, 200);
     } else {
       setTimeout(() => goTo('midway-existing-work'), 200);
     }
@@ -512,6 +626,7 @@ export function Coach() {
                 setCtx((prev) => ({ ...prev, issueArea: 'Other' }));
                 goTo('q2-goal');
               }}
+              otherPlaceholder="Describe your engagement topic..."
               canGoBack={false}
             />
           )}
@@ -526,8 +641,18 @@ export function Coach() {
               value={ctx.primaryGoal}
               onSelect={(v) => {
                 setCtx((prev) => ({ ...prev, primaryGoal: v }));
-                setTimeout(() => goTo('q3-audience'), 200);
+                if (v !== 'Other') setTimeout(() => goTo('q3-audience'), 200);
               }}
+              hasOther
+              otherValue={ctx.primaryGoalOther}
+              onOtherChange={(v) =>
+                setCtx((prev) => ({ ...prev, primaryGoalOther: v }))
+              }
+              onOtherSubmit={() => {
+                setCtx((prev) => ({ ...prev, primaryGoal: 'Other' }));
+                goTo('q3-audience');
+              }}
+              otherPlaceholder="Describe your primary goal..."
               onBack={goBack}
             />
           )}
@@ -543,6 +668,12 @@ export function Coach() {
               onChange={(v) => setCtx((prev) => ({ ...prev, audience: v }))}
               onNext={() => goTo('q4-timeline')}
               onBack={goBack}
+              hasOther
+              otherValue={ctx.audienceOther}
+              onOtherChange={(v) =>
+                setCtx((prev) => ({ ...prev, audienceOther: v }))
+              }
+              otherPlaceholder="Describe the audience you're trying to reach..."
             />
           )}
 
@@ -573,6 +704,12 @@ export function Coach() {
               onChange={(v) => setCtx((prev) => ({ ...prev, resources: v }))}
               onNext={() => goTo('q6-constraint')}
               onBack={goBack}
+              hasOther
+              otherValue={ctx.resourcesOther}
+              onOtherChange={(v) =>
+                setCtx((prev) => ({ ...prev, resourcesOther: v }))
+              }
+              otherPlaceholder="Describe your resource..."
             />
           )}
 
@@ -586,8 +723,18 @@ export function Coach() {
               value={ctx.biggestConstraint}
               onSelect={(v) => {
                 setCtx((prev) => ({ ...prev, biggestConstraint: v }));
-                setTimeout(() => goTo('q7-ai'), 200);
+                if (v !== 'Other') setTimeout(() => goTo('q7-ai'), 200);
               }}
+              hasOther
+              otherValue={ctx.biggestConstraintOther}
+              onOtherChange={(v) =>
+                setCtx((prev) => ({ ...prev, biggestConstraintOther: v }))
+              }
+              onOtherSubmit={() => {
+                setCtx((prev) => ({ ...prev, biggestConstraint: 'Other' }));
+                goTo('q7-ai');
+              }}
+              otherPlaceholder="Describe your biggest constraint..."
               onBack={goBack}
             />
           )}
@@ -618,8 +765,18 @@ export function Coach() {
               value={ctx.successLooksLike}
               onSelect={(v) => {
                 setCtx((prev) => ({ ...prev, successLooksLike: v }));
-                setTimeout(() => goTo('q9-stuck'), 200);
+                if (v !== 'Other') setTimeout(() => goTo('q9-stuck'), 200);
               }}
+              hasOther
+              otherValue={ctx.successOther}
+              onOtherChange={(v) =>
+                setCtx((prev) => ({ ...prev, successOther: v }))
+              }
+              onOtherSubmit={() => {
+                setCtx((prev) => ({ ...prev, successLooksLike: 'Other' }));
+                goTo('q9-stuck');
+              }}
+              otherPlaceholder="Describe what success looks like..."
               onBack={goBack}
             />
           )}
@@ -634,8 +791,18 @@ export function Coach() {
               value={ctx.stuckPoint}
               onSelect={(v) => {
                 setCtx((prev) => ({ ...prev, stuckPoint: v }));
-                setTimeout(() => goTo('q10-process'), 200);
+                if (v !== 'Other') setTimeout(() => goTo('q10-process'), 200);
               }}
+              hasOther
+              otherValue={ctx.stuckPointOther}
+              onOtherChange={(v) =>
+                setCtx((prev) => ({ ...prev, stuckPointOther: v }))
+              }
+              onOtherSubmit={() => {
+                setCtx((prev) => ({ ...prev, stuckPoint: 'Other' }));
+                goTo('q10-process');
+              }}
+              otherPlaceholder="Describe where you feel stuck..."
               onBack={goBack}
             />
           )}
@@ -709,7 +876,8 @@ export function Coach() {
                 <button
                   onClick={() => {
                     setCtx((prev) => ({ ...prev, midwayChoice: 'plan' }));
-                    goTo('plan-output');
+                    setCurrentPhase('followup');
+                    fetchFollowUpQuestions({ ...ctx, midwayChoice: 'plan' });
                   }}
                   className="w-full text-left p-6 border border-gray-200 rounded-lg hover:border-gray-900 hover:shadow-md transition-all group cursor-pointer"
                 >
@@ -761,120 +929,215 @@ export function Coach() {
             </div>
           )}
 
+          {/* ── Follow-up Questions ── */}
+          {currentPhase === 'followup' && (
+            <div className="space-y-6">
+              {followUpLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                  <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                  <p className="text-gray-600 font-medium">Reviewing your answers...</p>
+                  <p className="text-sm text-gray-400">
+                    Our AI is checking for any areas that need clarification
+                  </p>
+                </div>
+              ) : followUpQuestions.length > 0 ? (
+                <>
+                  <div>
+                    <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                      A few quick follow-ups
+                    </h2>
+                    <p className="text-gray-600">
+                      Based on your answers, we have a few clarifying questions to help generate a better plan.
+                    </p>
+                  </div>
+                  <div className="space-y-5">
+                    {followUpQuestions.map((fq) => (
+                      <div key={fq.id} className="space-y-2">
+                        <label className="block text-gray-900 font-medium">
+                          {fq.question}
+                        </label>
+                        <p className="text-xs text-gray-500 italic">{fq.why}</p>
+                        <textarea
+                          className="w-full min-h-[80px] p-3 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-y text-sm"
+                          placeholder="Your answer..."
+                          value={ctx.followUpAnswers[fq.id] || ''}
+                          onChange={(e) =>
+                            setCtx((prev) => ({
+                              ...prev,
+                              followUpAnswers: {
+                                ...prev.followUpAnswers,
+                                [fq.id]: e.target.value,
+                              },
+                            }))
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between pt-2">
+                    <button
+                      onClick={goBack}
+                      className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Back
+                    </button>
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => goTo('plan-output')}
+                      >
+                        Skip
+                      </Button>
+                      <Button onClick={() => goTo('plan-output')}>
+                        Continue
+                        <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                  <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                  <p className="text-gray-600 font-medium">Preparing your plan...</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Plan Output ── */}
           {currentPhase === 'plan-output' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-1">
-                    Your Engagement Plan
-                  </h2>
-                  <p className="text-gray-500 text-sm">
-                    Review, edit, and download your tailored plan
+              {planLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                  <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                  <p className="text-gray-600 font-medium">
+                    Generating your engagement plan...
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    Our AI is researching methods, case studies, and strategies
+                    from the knowledge base
                   </p>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsEditing(!isEditing)}
-                  >
-                    <Edit3 className="w-4 h-4" />
-                    {isEditing ? 'Preview' : 'Edit'}
-                  </Button>
-                  <Button size="sm" onClick={handleDownload}>
-                    <Download className="w-4 h-4" />
-                    Download
-                  </Button>
-                </div>
-              </div>
-
-              {isEditing ? (
-                <textarea
-                  className="w-full min-h-[400px] p-4 border border-gray-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-y"
-                  value={editablePlan}
-                  onChange={(e) => setEditablePlan(e.target.value)}
-                />
               ) : (
-                <div className="prose prose-sm max-w-none p-6 bg-gray-50 rounded-lg border border-gray-200">
-                  <MarkdownRenderer text={editablePlan || generatedPlan} />
-                </div>
-              )}
-
-              {/* Recommended Case Studies */}
-              {recommendedStudies.length > 0 && (
-                <div className="mt-8">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    Recommended Case Studies
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Ranked by relevance to your context, constraints, and
-                    timeline
-                  </p>
-                  <div className="space-y-3">
-                    {recommendedStudies.map(({ study, score }, idx) => (
-                      <Link
-                        key={study.id}
-                        to={`/case-studies/${study.id}`}
-                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-400 hover:shadow-sm transition-all group"
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-2xl font-semibold text-gray-900 mb-1">
+                        Your Engagement Plan
+                      </h2>
+                      <p className="text-gray-500 text-sm">
+                        Review, edit, and download your tailored plan
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEditing(!isEditing)}
                       >
-                        <div className="flex items-start gap-4">
-                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 text-sm font-semibold flex-shrink-0">
-                            {idx + 1}
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-gray-900 group-hover:underline">
-                              {study.title}
-                            </h4>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                              <span>{study.location}</span>
-                              <span>&bull;</span>
-                              <span>{study.timeframe}</span>
-                              <span>&bull;</span>
-                              <span>{study.size}</span>
-                            </div>
-                            <div className="flex gap-1.5 mt-2">
-                              {study.tags.map((tag) => (
-                                <Badge
-                                  key={tag}
-                                  variant="secondary"
-                                  className="text-xs"
-                                >
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <div className="text-right">
-                            <div className="text-xs text-gray-500">
-                              Relevance
-                            </div>
-                            <div className="text-sm font-semibold text-gray-900">
-                              {Math.min(
-                                Math.round((score / 12) * 100),
-                                98
-                              )}
-                              %
-                            </div>
-                          </div>
-                          <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-gray-900 transition-colors" />
-                        </div>
-                      </Link>
-                    ))}
+                        <Edit3 className="w-4 h-4" />
+                        {isEditing ? 'Preview' : 'Edit'}
+                      </Button>
+                      <Button size="sm" onClick={handleDownload}>
+                        <Download className="w-4 h-4" />
+                        Download
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              <div className="pt-4 border-t border-gray-200">
-                <p className="text-xs text-gray-500 italic">
-                  This plan is a starting point grounded in course frameworks.
-                  Edit it freely to match your specific context. The tool does
-                  not generate engagement outputs (like reports or surveys) —
-                  it provides guidance for you to follow.
-                </p>
-              </div>
+                  {isEditing ? (
+                    <textarea
+                      className="w-full min-h-[400px] p-4 border border-gray-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-y"
+                      value={editablePlan}
+                      onChange={(e) => setEditablePlan(e.target.value)}
+                    />
+                  ) : (
+                    <div className="prose prose-sm max-w-none p-6 bg-gray-50 rounded-lg border border-gray-200">
+                      <MarkdownRenderer text={editablePlan || generatedPlan} />
+                    </div>
+                  )}
+
+                  {planSources.length > 0 && (
+                    <PlanSourceList sources={planSources} />
+                  )}
+
+                  {/* Recommended Case Studies */}
+                  {recommendedStudies.length > 0 && (
+                    <div className="mt-8">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                        Recommended Case Studies
+                      </h3>
+                      <p className="text-sm text-gray-500 mb-4">
+                        Ranked by relevance to your context, constraints, and
+                        timeline
+                      </p>
+                      <div className="space-y-3">
+                        {recommendedStudies.map(({ study, score }, idx) => (
+                          <Link
+                            key={study.id}
+                            to={`/case-studies/${study.id}`}
+                            className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-400 hover:shadow-sm transition-all group"
+                          >
+                            <div className="flex items-start gap-4">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 text-sm font-semibold flex-shrink-0">
+                                {idx + 1}
+                              </div>
+                              <div>
+                                <h4 className="font-medium text-gray-900 group-hover:underline">
+                                  {study.title}
+                                </h4>
+                                <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                                  <span>{study.location}</span>
+                                  <span>&bull;</span>
+                                  <span>{study.timeframe}</span>
+                                  <span>&bull;</span>
+                                  <span>{study.size}</span>
+                                </div>
+                                <div className="flex gap-1.5 mt-2">
+                                  {study.tags.map((tag) => (
+                                    <Badge
+                                      key={tag}
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              <div className="text-right">
+                                <div className="text-xs text-gray-500">
+                                  Relevance
+                                </div>
+                                <div className="text-sm font-semibold text-gray-900">
+                                  {Math.min(
+                                    Math.round((score / 12) * 100),
+                                    98
+                                  )}
+                                  %
+                                </div>
+                              </div>
+                              <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-gray-900 transition-colors" />
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 italic">
+                      This plan is grounded in evidence from the knowledge base.
+                      Edit it freely to match your specific context. The tool does
+                      not generate engagement outputs (like reports or surveys) —
+                      it provides guidance for you to follow.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -898,6 +1161,7 @@ function SingleSelectQuestion({
   otherValue = '',
   onOtherChange,
   onOtherSubmit,
+  otherPlaceholder = 'Describe your option...',
 }: {
   number: number;
   title: string;
@@ -911,6 +1175,7 @@ function SingleSelectQuestion({
   otherValue?: string;
   onOtherChange?: (v: string) => void;
   onOtherSubmit?: () => void;
+  otherPlaceholder?: string;
 }) {
   const [showOtherInput, setShowOtherInput] = useState(
     value === 'Other' && hasOther
@@ -968,7 +1233,7 @@ function SingleSelectQuestion({
                 <input
                   type="text"
                   className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  placeholder="Describe your engagement topic..."
+                  placeholder={otherPlaceholder}
                   value={otherValue}
                   onChange={(e) => onOtherChange?.(e.target.value)}
                   onKeyDown={(e) => {
@@ -1015,6 +1280,10 @@ function MultiSelectQuestion({
   onChange,
   onNext,
   onBack,
+  hasOther = false,
+  otherValue = '',
+  onOtherChange,
+  otherPlaceholder = 'Describe your option...',
 }: {
   number: number;
   title: string;
@@ -1024,7 +1293,15 @@ function MultiSelectQuestion({
   onChange: (v: string[]) => void;
   onNext: () => void;
   onBack?: () => void;
+  hasOther?: boolean;
+  otherValue?: string;
+  onOtherChange?: (v: string) => void;
+  otherPlaceholder?: string;
 }) {
+  const [showOtherInput, setShowOtherInput] = useState(
+    value.includes('Other') && hasOther,
+  );
+
   const toggle = (opt: string) => {
     if (value.includes(opt)) {
       onChange(value.filter((v) => v !== opt));
@@ -1032,6 +1309,10 @@ function MultiSelectQuestion({
       onChange([...value, opt]);
     }
   };
+
+  const otherSelected = value.includes('Other');
+  const canContinue =
+    value.length > 0 && (!otherSelected || !!otherValue?.trim());
 
   return (
     <div className="space-y-6">
@@ -1071,6 +1352,49 @@ function MultiSelectQuestion({
             </button>
           );
         })}
+
+        {hasOther && (
+          <>
+            <button
+              onClick={() => {
+                toggle('Other');
+                setShowOtherInput(!otherSelected);
+              }}
+              className={`w-full text-left px-5 py-3.5 border rounded-lg transition-all cursor-pointer ${
+                otherSelected
+                  ? 'border-gray-900 bg-gray-50 shadow-sm'
+                  : 'border-gray-200 hover:border-gray-400'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                    otherSelected
+                      ? 'bg-gray-900 border-gray-900'
+                      : 'border-gray-300'
+                  }`}
+                >
+                  {otherSelected && (
+                    <Check className="w-3 h-3 text-white" />
+                  )}
+                </div>
+                <span className="text-gray-900">Other</span>
+              </div>
+            </button>
+            {showOtherInput && otherSelected && (
+              <div className="ml-8">
+                <input
+                  type="text"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  placeholder={otherPlaceholder}
+                  value={otherValue}
+                  onChange={(e) => onOtherChange?.(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <div className="flex items-center justify-between pt-2">
@@ -1085,7 +1409,7 @@ function MultiSelectQuestion({
         ) : (
           <div />
         )}
-        <Button onClick={onNext} disabled={value.length === 0}>
+        <Button onClick={onNext} disabled={!canContinue}>
           Continue
           <ArrowRight className="w-4 h-4" />
         </Button>
@@ -1167,4 +1491,64 @@ function renderInlineEmphasis(text: string) {
     }
     return part;
   });
+}
+
+/* ── Source list for plan output ── */
+
+function PlanSourceList({ sources }: { sources: SourceDoc[] }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const uniqueSources = sources.filter(
+    (s, i, arr) => arr.findIndex((d) => d.title === s.title) === i,
+  );
+
+  if (uniqueSources.length === 0) return null;
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors cursor-pointer w-full"
+      >
+        {isExpanded ? (
+          <ChevronUp className="w-4 h-4" />
+        ) : (
+          <ChevronDown className="w-4 h-4" />
+        )}
+        {uniqueSources.length} source{uniqueSources.length !== 1 ? 's' : ''}{' '}
+        referenced
+      </button>
+      {isExpanded && (
+        <div className="mt-3 space-y-2">
+          {uniqueSources.map((src, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-2 text-sm text-gray-600"
+            >
+              <span className="text-gray-400 mt-px flex-shrink-0">&bull;</span>
+              <span>
+                {src.title}
+                {src.contentTypeLabel && (
+                  <span className="text-gray-400">
+                    {' '}
+                    &middot; {src.contentTypeLabel}
+                  </span>
+                )}
+                {src.sourceUrl && (
+                  <a
+                    href={src.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-0.5 text-gray-600 hover:text-gray-900 ml-1"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

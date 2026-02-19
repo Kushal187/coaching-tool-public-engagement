@@ -9,6 +9,10 @@ import {
   Target,
   Edit3,
   Download,
+  Loader2,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -17,10 +21,16 @@ import { caseStudies } from '../data/caseStudies';
 
 type AdaptStep = 'info' | 'context' | 'constraints' | 'output';
 
-function generateAdaptedPlan(
+type SourceDoc = {
+  title: string;
+  sourceUrl: string;
+  contentTypeLabel: string | null;
+};
+
+function generateAdaptedPlanFallback(
   caseStudy: (typeof caseStudies)[0],
   context: string,
-  constraints: string
+  constraints: string,
 ): string {
   let plan = '';
   plan += `## Adapted Plan: Based on ${caseStudy.title}\n\n`;
@@ -75,6 +85,8 @@ export function CaseStudyDetail() {
   const [adaptedPlan, setAdaptedPlan] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editablePlan, setEditablePlan] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [sources, setSources] = useState<SourceDoc[]>([]);
 
   if (!caseStudy) {
     return (
@@ -91,15 +103,66 @@ export function CaseStudyDetail() {
   const currentIdx = steps.indexOf(adaptStep);
   const progressPct = Math.round(((currentIdx + 1) / steps.length) * 100);
 
-  const handleGeneratePlan = () => {
-    const plan = generateAdaptedPlan(
-      caseStudy,
-      adaptContext,
-      adaptConstraints
-    );
-    setAdaptedPlan(plan);
-    setEditablePlan(plan);
+  const handleGeneratePlan = async () => {
     setAdaptStep('output');
+    setIsGenerating(true);
+    setAdaptedPlan('');
+    setEditablePlan('');
+    setSources([]);
+
+    try {
+      const res = await fetch('/.netlify/functions/adapt-case-study', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caseStudy: {
+            title: caseStudy.title,
+            location: caseStudy.location,
+            timeframe: caseStudy.timeframe,
+            size: caseStudy.size,
+            demographic: caseStudy.demographic,
+            tags: caseStudy.tags,
+            description: caseStudy.description,
+            keyOutcomes: caseStudy.keyOutcomes,
+            implementationSteps: caseStudy.implementationSteps,
+          },
+          context: adaptContext,
+          constraints: adaptConstraints,
+        }),
+      });
+
+      if (!res.ok) throw new Error('API request failed');
+
+      const text = await res.text();
+      const lines = text.split('\n');
+      let planContent = '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') break;
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.content) planContent += parsed.content;
+          if (parsed.sourceDocuments) setSources(parsed.sourceDocuments);
+        } catch { /* skip malformed */ }
+      }
+
+      setAdaptedPlan(planContent);
+      setEditablePlan(planContent);
+    } catch (err) {
+      console.error('Agentic adaptation failed, using fallback:', err);
+      const fallback = generateAdaptedPlanFallback(
+        caseStudy,
+        adaptContext,
+        adaptConstraints,
+      );
+      setAdaptedPlan(fallback);
+      setEditablePlan(fallback);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleDownload = () => {
@@ -204,8 +267,8 @@ export function CaseStudyDetail() {
                     on the <strong>{caseStudy.title}</strong> approach.
                   </p>
                   <p className="text-sm text-gray-500">
-                    This is a simplified version of the full coaching flow —
-                    less comprehensive but still actionable.
+                    Our AI will search the knowledge base for relevant evidence
+                    to ground every recommendation in your adapted plan.
                   </p>
                   <Button
                     onClick={() => setAdaptStep('context')}
@@ -292,105 +355,123 @@ export function CaseStudyDetail() {
               {/* Step: Output */}
               {adaptStep === 'output' && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Your Adapted Plan
-                    </h3>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsEditing(!isEditing)}
-                      >
-                        <Edit3 className="w-4 h-4" />
-                        {isEditing ? 'Preview' : 'Edit'}
-                      </Button>
-                      <Button size="sm" onClick={handleDownload}>
-                        <Download className="w-4 h-4" />
-                        Download
-                      </Button>
+                  {isGenerating ? (
+                    <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                      <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                      <p className="text-gray-600 font-medium">
+                        Researching and adapting the case study...
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        Our AI is searching the knowledge base for relevant evidence
+                      </p>
                     </div>
-                  </div>
-
-                  {isEditing ? (
-                    <textarea
-                      className="w-full min-h-[350px] p-4 border border-gray-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-y"
-                      value={editablePlan}
-                      onChange={(e) => setEditablePlan(e.target.value)}
-                    />
                   ) : (
-                    <div className="prose prose-sm max-w-none p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      {(editablePlan || adaptedPlan)
-                        .split('\n')
-                        .map((line, i) => {
-                          if (line.startsWith('## '))
-                            return (
-                              <h2
-                                key={i}
-                                className="text-lg font-semibold text-gray-900 mt-3 mb-2"
-                              >
-                                {line.replace('## ', '')}
-                              </h2>
-                            );
-                          if (line.startsWith('### '))
-                            return (
-                              <h3
-                                key={i}
-                                className="text-base font-semibold text-gray-900 mt-4 mb-2"
-                              >
-                                {line.replace('### ', '')}
-                              </h3>
-                            );
-                          if (line.startsWith('**'))
-                            return (
-                              <p
-                                key={i}
-                                className="text-gray-700 mb-1 text-sm"
-                              >
-                                <strong>
-                                  {line.match(/\*\*(.*?)\*\*/)?.[1] || ''}
-                                </strong>
-                                {line.replace(/\*\*.*?\*\*/, '')}
-                              </p>
-                            );
-                          if (line.startsWith('- '))
-                            return (
-                              <div
-                                key={i}
-                                className="flex gap-2 text-gray-700 mb-1 ml-4 text-sm"
-                              >
-                                <span className="text-gray-400 flex-shrink-0">
-                                  &bull;
-                                </span>
-                                <span>{line.replace('- ', '')}</span>
-                              </div>
-                            );
-                          if (line.trim() === '')
-                            return <div key={i} className="h-2" />;
-                          return (
-                            <p
-                              key={i}
-                              className="text-gray-700 mb-1 text-sm"
-                            >
-                              {line}
-                            </p>
-                          );
-                        })}
-                    </div>
-                  )}
+                    <>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Your Adapted Plan
+                        </h3>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsEditing(!isEditing)}
+                          >
+                            <Edit3 className="w-4 h-4" />
+                            {isEditing ? 'Preview' : 'Edit'}
+                          </Button>
+                          <Button size="sm" onClick={handleDownload}>
+                            <Download className="w-4 h-4" />
+                            Download
+                          </Button>
+                        </div>
+                      </div>
 
-                  <p className="text-xs text-gray-500 italic">
-                    This adapted plan is a starting point. Edit it freely to
-                    better match your specific context. For a more
-                    comprehensive plan, try the{' '}
-                    <Link
-                      to="/coach"
-                      className="text-gray-900 underline"
-                    >
-                      full coaching flow
-                    </Link>
-                    .
-                  </p>
+                      {isEditing ? (
+                        <textarea
+                          className="w-full min-h-[350px] p-4 border border-gray-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-y"
+                          value={editablePlan}
+                          onChange={(e) => setEditablePlan(e.target.value)}
+                        />
+                      ) : (
+                        <div className="prose prose-sm max-w-none p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          {(editablePlan || adaptedPlan)
+                            .split('\n')
+                            .map((line, i) => {
+                              if (line.startsWith('## '))
+                                return (
+                                  <h2
+                                    key={i}
+                                    className="text-lg font-semibold text-gray-900 mt-3 mb-2"
+                                  >
+                                    {line.replace('## ', '')}
+                                  </h2>
+                                );
+                              if (line.startsWith('### '))
+                                return (
+                                  <h3
+                                    key={i}
+                                    className="text-base font-semibold text-gray-900 mt-4 mb-2"
+                                  >
+                                    {line.replace('### ', '')}
+                                  </h3>
+                                );
+                              if (line.startsWith('**'))
+                                return (
+                                  <p
+                                    key={i}
+                                    className="text-gray-700 mb-1 text-sm"
+                                  >
+                                    <strong>
+                                      {line.match(/\*\*(.*?)\*\*/)?.[1] || ''}
+                                    </strong>
+                                    {line.replace(/\*\*.*?\*\*/, '')}
+                                  </p>
+                                );
+                              if (line.startsWith('- '))
+                                return (
+                                  <div
+                                    key={i}
+                                    className="flex gap-2 text-gray-700 mb-1 ml-4 text-sm"
+                                  >
+                                    <span className="text-gray-400 flex-shrink-0">
+                                      &bull;
+                                    </span>
+                                    <span>{line.replace('- ', '')}</span>
+                                  </div>
+                                );
+                              if (line.trim() === '')
+                                return <div key={i} className="h-2" />;
+                              return (
+                                <p
+                                  key={i}
+                                  className="text-gray-700 mb-1 text-sm"
+                                >
+                                  {line}
+                                </p>
+                              );
+                            })}
+                        </div>
+                      )}
+
+                      {sources.length > 0 && (
+                        <SourceList sources={sources} />
+                      )}
+
+                      <p className="text-xs text-gray-500 italic">
+                        This adapted plan is a starting point. Edit it freely to
+                        better match your specific context. For a more
+                        comprehensive plan, try the{' '}
+                        <Link
+                          to="/coach"
+                          className="text-gray-900 underline"
+                        >
+                          full coaching flow
+                        </Link>
+                        .
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -450,6 +531,60 @@ export function CaseStudyDetail() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SourceList({ sources }: { sources: SourceDoc[] }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const uniqueSources = sources.filter(
+    (s, i, arr) => arr.findIndex((d) => d.title === s.title) === i,
+  );
+
+  if (uniqueSources.length === 0) return null;
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors cursor-pointer w-full"
+      >
+        {isExpanded ? (
+          <ChevronUp className="w-4 h-4" />
+        ) : (
+          <ChevronDown className="w-4 h-4" />
+        )}
+        {uniqueSources.length} source{uniqueSources.length !== 1 ? 's' : ''} referenced
+      </button>
+      {isExpanded && (
+        <div className="mt-3 space-y-2">
+          {uniqueSources.map((src, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-2 text-sm text-gray-600"
+            >
+              <span className="text-gray-400 mt-px flex-shrink-0">&bull;</span>
+              <span>
+                {src.title}
+                {src.contentTypeLabel && (
+                  <span className="text-gray-400"> &middot; {src.contentTypeLabel}</span>
+                )}
+                {src.sourceUrl && (
+                  <a
+                    href={src.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-0.5 text-gray-600 hover:text-gray-900 ml-1"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
