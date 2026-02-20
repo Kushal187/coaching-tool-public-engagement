@@ -416,8 +416,9 @@ export function Coach() {
   const [isEditing, setIsEditing] = useState(false);
   const [editablePlan, setEditablePlan] = useState('');
   const [recommendedStudies, setRecommendedStudies] = useState<
-    { study: CaseStudy; score: number }[]
+    { study: CaseStudy; score: number; reason?: string }[]
   >([]);
+  const [scoringLoading, setScoringLoading] = useState(false);
   const [allCaseStudies, setAllCaseStudies] = useState<CaseStudy[]>([]);
   const [followUpQuestions, setFollowUpQuestions] = useState<FollowUpQuestion[]>([]);
   const [followUpLoading, setFollowUpLoading] = useState(false);
@@ -443,17 +444,57 @@ export function Coach() {
       ? 100
       : Math.round(((currentIdx + 1) / phases.length) * 100);
 
+  const fetchAgentScores = useCallback(async (context: UserContext, plan: string, studies: CaseStudy[]) => {
+    if (studies.length === 0) return;
+    setScoringLoading(true);
+
+    try {
+      const res = await fetch('/api/score-case-studies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userContext: context, plan, caseStudies: studies }),
+      });
+
+      if (!res.ok) throw new Error('Scoring API failed');
+
+      const { scores } = await res.json();
+      if (!Array.isArray(scores) || scores.length === 0) throw new Error('Empty scores');
+
+      const studyMap = new Map(studies.map((s) => [s.id, s]));
+      const ranked = scores
+        .filter((s: { id: string }) => studyMap.has(s.id))
+        .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
+        .slice(0, 5)
+        .map((s: { id: string; score: number; reason?: string }) => ({
+          study: studyMap.get(s.id)!,
+          score: s.score,
+          reason: s.reason,
+        }));
+
+      setRecommendedStudies(ranked);
+    } catch (err) {
+      console.error('Agent scoring failed, using heuristic fallback:', err);
+      const fallback = studies
+        .map((cs) => ({
+          study: cs,
+          score: Math.min(Math.round((scoreCaseStudy(cs, context) / 12) * 100), 98),
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
+      setRecommendedStudies(fallback);
+    } finally {
+      setScoringLoading(false);
+    }
+  }, []);
+
   const fetchPlan = useCallback(async (context: UserContext) => {
     setPlanLoading(true);
     setGeneratedPlan('');
     setEditablePlan('');
     setPlanSources([]);
+    setRecommendedStudies([]);
 
-    const scored = allCaseStudies
-      .map((cs) => ({ study: cs, score: scoreCaseStudy(cs, context) }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
-    setRecommendedStudies(scored);
+    let planContent = '';
 
     try {
       const res = await fetch('/api/generate-plan', {
@@ -469,7 +510,6 @@ export function Coach() {
 
       const text = await res.text();
       const lines = text.split('\n');
-      let planContent = '';
 
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
@@ -487,13 +527,15 @@ export function Coach() {
       setEditablePlan(planContent);
     } catch (err) {
       console.error('Agentic plan generation failed, using fallback:', err);
-      const fallback = generatePlan(context);
-      setGeneratedPlan(fallback);
-      setEditablePlan(fallback);
+      planContent = generatePlan(context);
+      setGeneratedPlan(planContent);
+      setEditablePlan(planContent);
     } finally {
       setPlanLoading(false);
     }
-  }, [allCaseStudies]);
+
+    fetchAgentScores(context, planContent, allCaseStudies);
+  }, [allCaseStudies, fetchAgentScores]);
 
   const goTo = (phase: CoachingPhase) => {
     if (phase === 'plan-output') {
@@ -517,6 +559,7 @@ export function Coach() {
     setFollowUpLoading(false);
     setPlanLoading(false);
     setPlanSources([]);
+    setScoringLoading(false);
   };
 
   const handleDownload = () => {
@@ -1077,17 +1120,27 @@ export function Coach() {
                   )}
 
                   {/* Recommended Case Studies */}
-                  {recommendedStudies.length > 0 && (
-                    <div className="mt-8">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                        Recommended Case Studies
-                      </h3>
-                      <p className="text-sm text-gray-500 mb-4">
-                        Ranked by relevance to your context, constraints, and
-                        timeline
-                      </p>
+                  <div className="mt-8">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      Recommended Case Studies
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Ranked by relevance to your context, constraints, and
+                      timeline
+                    </p>
+
+                    {scoringLoading && (
+                      <div className="flex flex-col items-center justify-center py-10 space-y-3">
+                        <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+                        <p className="text-sm text-gray-500">
+                          Scoring case studies against your context...
+                        </p>
+                      </div>
+                    )}
+
+                    {!scoringLoading && recommendedStudies.length > 0 && (
                       <div className="space-y-3">
-                        {recommendedStudies.map(({ study, score }, idx) => (
+                        {recommendedStudies.map(({ study, score, reason }, idx) => (
                           <Link
                             key={study.id}
                             to={`/case-studies/${study.id}`}
@@ -1110,6 +1163,11 @@ export function Coach() {
                                     {study.scale} scale
                                   </span>
                                 </div>
+                                {reason && (
+                                  <p className="text-xs text-gray-500 mt-1.5 italic">
+                                    {reason}
+                                  </p>
+                                )}
                                 <div className="flex gap-1.5 mt-2">
                                   {study.tags.map((tag) => (
                                     <Badge
@@ -1129,11 +1187,7 @@ export function Coach() {
                                   Relevance
                                 </div>
                                 <div className="text-sm font-semibold text-gray-900">
-                                  {Math.min(
-                                    Math.round((score / 12) * 100),
-                                    98
-                                  )}
-                                  %
+                                  {Math.min(Math.round(score), 99)}%
                                 </div>
                               </div>
                               <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-gray-900 transition-colors" />
@@ -1141,8 +1195,14 @@ export function Coach() {
                           </Link>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    )}
+
+                    {!scoringLoading && recommendedStudies.length === 0 && allCaseStudies.length === 0 && (
+                      <p className="text-sm text-gray-400 italic py-4">
+                        No case studies available for scoring.
+                      </p>
+                    )}
+                  </div>
 
                   <div className="pt-4 border-t border-gray-200">
                     <p className="text-xs text-gray-500 italic">
