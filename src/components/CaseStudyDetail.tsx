@@ -17,6 +17,7 @@ import {
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
+import { MarkdownContent } from './ui/markdown-content';
 import type { CaseStudy } from '../data/caseStudies';
 
 type AdaptStep = 'info' | 'context' | 'constraints' | 'output';
@@ -48,7 +49,7 @@ export function CaseStudyDetail() {
     setLoading(true);
     setFetchError(null);
 
-    fetch(`/.netlify/functions/case-studies?id=${encodeURIComponent(caseStudyId)}`)
+    fetch(`/api/case-studies?id=${encodeURIComponent(caseStudyId)}`)
       .then(async (res) => {
         if (!res.ok) throw new Error(`Not found (${res.status})`);
         return res.json();
@@ -104,7 +105,7 @@ export function CaseStudyDetail() {
     setSources([]);
 
     try {
-      const res = await fetch('/.netlify/functions/adapt-case-study', {
+      const res = await fetch('/api/adapt-case-study', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -272,8 +273,8 @@ export function CaseStudyDetail() {
               </button>
               {showFullContent && (
                 <div className="px-4 pb-4">
-                  <div className="prose prose-sm max-w-none p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <SimpleMarkdownRenderer text={caseStudy.fullContent} />
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <MarkdownContent>{caseStudy.fullContent}</MarkdownContent>
                   </div>
                 </div>
               )}
@@ -430,10 +431,10 @@ export function CaseStudyDetail() {
                           onChange={(e) => setEditablePlan(e.target.value)}
                         />
                       ) : (
-                        <div className="prose prose-sm max-w-none p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <SimpleMarkdownRenderer
-                            text={editablePlan || adaptedPlan}
-                          />
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <MarkdownContent sources={sources}>
+                            {editablePlan || adaptedPlan}
+                          </MarkdownContent>
                         </div>
                       )}
 
@@ -515,58 +516,6 @@ export function CaseStudyDetail() {
         </div>
       </div>
     </div>
-  );
-}
-
-function SimpleMarkdownRenderer({ text }: { text: string }) {
-  return (
-    <>
-      {text.split('\n').map((line, i) => {
-        if (line.startsWith('## '))
-          return (
-            <h2
-              key={i}
-              className="text-lg font-semibold text-gray-900 mt-3 mb-2"
-            >
-              {line.replace('## ', '')}
-            </h2>
-          );
-        if (line.startsWith('### '))
-          return (
-            <h3
-              key={i}
-              className="text-base font-semibold text-gray-900 mt-4 mb-2"
-            >
-              {line.replace('### ', '')}
-            </h3>
-          );
-        if (line.startsWith('**'))
-          return (
-            <p key={i} className="text-gray-700 mb-1 text-sm">
-              <strong>
-                {line.match(/\*\*(.*?)\*\*/)?.[1] || ''}
-              </strong>
-              {line.replace(/\*\*.*?\*\*/, '')}
-            </p>
-          );
-        if (line.startsWith('- '))
-          return (
-            <div
-              key={i}
-              className="flex gap-2 text-gray-700 mb-1 ml-4 text-sm"
-            >
-              <span className="text-gray-400 flex-shrink-0">&bull;</span>
-              <span>{line.replace('- ', '')}</span>
-            </div>
-          );
-        if (line.trim() === '') return <div key={i} className="h-2" />;
-        return (
-          <p key={i} className="text-gray-700 mb-1 text-sm">
-            {line}
-          </p>
-        );
-      })}
-    </>
   );
 }
 

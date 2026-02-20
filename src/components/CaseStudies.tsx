@@ -24,7 +24,7 @@ export function CaseStudies() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/.netlify/functions/case-studies');
+      const res = await fetch('/api/case-studies');
       if (!res.ok) throw new Error(`Failed to load case studies (${res.status})`);
       const data: CaseStudy[] = await res.json();
       setCaseStudies(data);
