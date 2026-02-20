@@ -6,7 +6,7 @@
     "node": ">=20.12.2"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "node server.mjs & vite",
     "dev:server": "node server.mjs",
     "dev:vite": "vite",
     "start": "node server.mjs",
