@@ -16,6 +16,7 @@ import { Link } from 'react-router';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
+import { MarkdownContent } from './ui/markdown-content';
 import type { CaseStudy } from '../data/caseStudies';
 
 /* ── Question definitions ── */
@@ -425,7 +426,7 @@ export function Coach() {
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch('/.netlify/functions/case-studies')
+    fetch('/api/case-studies')
       .then((res) => (res.ok ? res.json() : []))
       .then((data: CaseStudy[]) => setAllCaseStudies(data))
       .catch(() => setAllCaseStudies([]));
@@ -455,7 +456,7 @@ export function Coach() {
     setRecommendedStudies(scored);
 
     try {
-      const res = await fetch('/.netlify/functions/generate-plan', {
+      const res = await fetch('/api/generate-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -535,7 +536,7 @@ export function Coach() {
     setFollowUpLoading(true);
     setFollowUpQuestions([]);
     try {
-      const res = await fetch('/.netlify/functions/generate-questions', {
+      const res = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(context),
@@ -1064,8 +1065,10 @@ export function Coach() {
                       onChange={(e) => setEditablePlan(e.target.value)}
                     />
                   ) : (
-                    <div className="prose prose-sm max-w-none p-6 bg-gray-50 rounded-lg border border-gray-200">
-                      <MarkdownRenderer text={editablePlan || generatedPlan} />
+                    <div className="p-6 bg-gray-50 rounded-lg border border-gray-200">
+                      <MarkdownContent sources={planSources}>
+                        {editablePlan || generatedPlan}
+                      </MarkdownContent>
                     </div>
                   )}
 
@@ -1429,81 +1432,6 @@ function MultiSelectQuestion({
       </div>
     </div>
   );
-}
-
-/* ── Simple markdown renderer ── */
-
-function MarkdownRenderer({ text }: { text: string }) {
-  return (
-    <>
-      {text.split('\n').map((line, i) => {
-        if (line.startsWith('## '))
-          return (
-            <h2
-              key={i}
-              className="text-xl font-semibold text-gray-900 mt-4 mb-2"
-            >
-              {line.replace('## ', '')}
-            </h2>
-          );
-        if (line.startsWith('### '))
-          return (
-            <h3
-              key={i}
-              className="text-lg font-semibold text-gray-900 mt-6 mb-2"
-            >
-              {line.replace('### ', '')}
-            </h3>
-          );
-        if (line.startsWith('> '))
-          return (
-            <blockquote
-              key={i}
-              className="border-l-4 border-gray-300 pl-4 text-gray-600 italic my-2"
-            >
-              {line.replace('> ', '')}
-            </blockquote>
-          );
-        if (line.startsWith('**')) {
-          const match = line.match(/\*\*(.*?)\*\*(.*)/);
-          if (match)
-            return (
-              <p key={i} className="text-gray-700 mb-1">
-                <strong>{match[1]}</strong>
-                {renderInlineEmphasis(match[2])}
-              </p>
-            );
-        }
-        if (line.startsWith('- '))
-          return (
-            <div key={i} className="flex gap-2 text-gray-700 mb-1 ml-4">
-              <span className="text-gray-400 flex-shrink-0">&bull;</span>
-              <span>{renderInlineEmphasis(line.replace('- ', ''))}</span>
-            </div>
-          );
-        if (line.trim() === '') return <div key={i} className="h-2" />;
-        return (
-          <p key={i} className="text-gray-700 mb-1">
-            {renderInlineEmphasis(line)}
-          </p>
-        );
-      })}
-    </>
-  );
-}
-
-function renderInlineEmphasis(text: string) {
-  const parts = text.split(/(\*[^*]+\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
-      return (
-        <em key={i} className="text-gray-600">
-          {part.slice(1, -1)}
-        </em>
-      );
-    }
-    return part;
-  });
 }
 
 /* ── Source list for plan output ── */

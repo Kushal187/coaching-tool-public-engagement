@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Upload, Paperclip, Loader2, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { MarkdownContent } from './ui/markdown-content';
 
 type SourceDoc = {
   title: string;
@@ -27,7 +28,7 @@ async function fetchBotResponse(
   onError: (err: string) => void,
 ) {
   try {
-    const res = await fetch('/.netlify/functions/chatbot', {
+    const res = await fetch('/api/chatbot', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: userMessage, conversation }),
@@ -237,12 +238,22 @@ export function ChatBot() {
                         {message.attachment}
                       </div>
                     )}
-                    {message.content || (message.isStreaming && (
-                      <span className="inline-flex items-center gap-1.5 text-gray-400">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Searching knowledge base...
-                      </span>
-                    ))}
+                    {message.content ? (
+                      message.type === 'bot' ? (
+                        <MarkdownContent sources={message.sources} compact>
+                          {message.content.replace(/###\s*Sources[\s\S]*$/, '').trim()}
+                        </MarkdownContent>
+                      ) : (
+                        message.content
+                      )
+                    ) : (
+                      message.isStreaming && (
+                        <span className="inline-flex items-center gap-1.5 text-gray-400">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Searching knowledge base...
+                        </span>
+                      )
+                    )}
                   </div>
                   {message.sources && message.sources.length > 0 && (
                     <SourceList sources={message.sources} />
