@@ -59,7 +59,10 @@ export function CaseStudies() {
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+        <h1
+          className="text-3xl text-[#124D8F] mb-2"
+          style={{ fontFamily: "'DM Serif Display', serif" }}
+        >
           Case Study Library
         </h1>
         <p className="text-gray-600">
@@ -69,21 +72,19 @@ export function CaseStudies() {
         </p>
       </div>
 
-      {/* Loading state */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-24 space-y-4">
-          <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
-          <p className="text-gray-500 font-medium">Loading case studies…</p>
+          <Loader2 className="w-8 h-8 text-[#124D8F] animate-spin" />
+          <p className="text-gray-500 font-medium">Loading case studies...</p>
         </div>
       )}
 
-      {/* Error state */}
       {error && !loading && (
         <div className="text-center py-16 space-y-4">
           <p className="text-gray-600">{error}</p>
           <button
             onClick={fetchCaseStudies}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-[#E4EFFC] transition-colors cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" />
             Retry
@@ -91,14 +92,12 @@ export function CaseStudies() {
         </div>
       )}
 
-      {/* Content */}
       {!loading && !error && (
         <>
-          {/* Filters */}
-          <div className="mb-8 p-6 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="mb-8 p-6 bg-[#E4EFFC]/40 border border-[#124D8F]/10 rounded-lg">
             <div className="flex items-center gap-2 mb-4">
-              <Filter className="w-5 h-5 text-gray-700" />
-              <span className="font-medium text-gray-900">
+              <Filter className="w-5 h-5 text-[#124D8F]" />
+              <span className="font-medium text-[#124D8F]">
                 Filter Case Studies
               </span>
             </div>
@@ -110,7 +109,7 @@ export function CaseStudies() {
                 <select
                   value={selectedSize}
                   onChange={(e) => setSelectedSize(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white cursor-pointer"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent bg-white cursor-pointer"
                 >
                   <option value="all">All Scales</option>
                   {sizes
@@ -129,7 +128,7 @@ export function CaseStudies() {
                 <select
                   value={selectedTag}
                   onChange={(e) => setSelectedTag(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white cursor-pointer"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent bg-white cursor-pointer"
                 >
                   <option value="all">All Topics</option>
                   {allTags.map((tag) => (
@@ -142,7 +141,6 @@ export function CaseStudies() {
             </div>
           </div>
 
-          {/* Case Study List */}
           <div className="space-y-6">
             {filteredCaseStudies.map((study) => (
               <div
@@ -150,12 +148,15 @@ export function CaseStudies() {
                 className="border border-gray-200 rounded-lg p-6 bg-white hover:shadow-md transition-shadow"
               >
                 <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-xl font-semibold text-gray-900">
+                  <h3
+                    className="text-xl text-[#124D8F]"
+                    style={{ fontFamily: "'DM Serif Display', serif" }}
+                  >
                     {study.title}
                   </h3>
                   <Link
                     to={`/case-studies/${study.id}`}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm rounded-md hover:bg-gray-800 transition-colors flex-shrink-0 ml-4"
+                    className="flex items-center gap-2 px-4 py-2 bg-[#124D8F] text-white text-sm rounded-md hover:bg-[#0e3d72] transition-colors flex-shrink-0 ml-4"
                   >
                     Adapt to My Situation
                     <ArrowRight className="w-4 h-4" />
@@ -164,14 +165,14 @@ export function CaseStudies() {
 
                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                   <div className="flex items-start gap-2">
-                    <MapPin className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <MapPin className="w-4 h-4 text-[#124D8F] mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="text-xs text-gray-500">Location</p>
                       <p className="text-sm text-gray-900">{study.location}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
-                    <Clock className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <Clock className="w-4 h-4 text-[#124D8F] mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="text-xs text-gray-500">Timeframe</p>
                       <p className="text-sm text-gray-900">
@@ -180,7 +181,7 @@ export function CaseStudies() {
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
-                    <Users className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <Users className="w-4 h-4 text-[#124D8F] mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="text-xs text-gray-500">Demographic</p>
                       <p className="text-sm text-gray-900">
@@ -189,7 +190,7 @@ export function CaseStudies() {
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
-                    <Target className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <Target className="w-4 h-4 text-[#124D8F] mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="text-xs text-gray-500">Scale</p>
                       <p className="text-sm text-gray-900 capitalize">
@@ -211,7 +212,7 @@ export function CaseStudies() {
 
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
-                    <h4 className="font-medium text-gray-900 mb-2">
+                    <h4 className="font-medium text-[#124D8F] mb-2">
                       Key Outcomes
                     </h4>
                     <ul className="space-y-1">
@@ -220,7 +221,7 @@ export function CaseStudies() {
                           key={index}
                           className="text-sm text-gray-600 flex gap-2"
                         >
-                          <span className="text-gray-400 flex-shrink-0">
+                          <span className="text-[#FDCE3E] flex-shrink-0">
                             &bull;
                           </span>
                           <span>{outcome}</span>
@@ -229,7 +230,7 @@ export function CaseStudies() {
                     </ul>
                   </div>
                   <div>
-                    <h4 className="font-medium text-gray-900 mb-2">
+                    <h4 className="font-medium text-[#124D8F] mb-2">
                       Implementation Steps
                     </h4>
                     <ol className="space-y-1">
@@ -238,7 +239,7 @@ export function CaseStudies() {
                           key={index}
                           className="text-sm text-gray-600 flex gap-2"
                         >
-                          <span className="text-gray-400 flex-shrink-0">
+                          <span className="text-[#124D8F] flex-shrink-0">
                             {index + 1}.
                           </span>
                           <span>{step}</span>

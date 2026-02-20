@@ -97,7 +97,7 @@ function Citation({ name, url }: { name: string; url?: string }) {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className={`${base} bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:text-blue-800 transition-colors no-underline`}
+        className={`${base} bg-[#E4EFFC] text-[#124D8F] border-[#124D8F]/20 hover:bg-[#124D8F]/15 hover:text-[#0e3d72] transition-colors no-underline`}
       >
         {label}
         <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
@@ -120,7 +120,7 @@ function SourceLink({
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="font-medium text-blue-600 underline decoration-blue-200 hover:decoration-blue-500 transition-colors"
+      className="font-medium text-[#124D8F] underline decoration-[#124D8F]/30 hover:decoration-[#124D8F] transition-colors"
     >
       {children}
       <ExternalLink className="w-3 h-3 ml-0.5 inline-block align-baseline" />
@@ -171,13 +171,13 @@ export function MarkdownContent({ children, sources = [], compact = false }: Pro
       remarkPlugins={[remarkGfm]}
       components={{
         h1: ({ children: c }) => (
-          <h1 className={`${sz.h1} font-bold text-gray-900 ${compact ? 'mt-3 mb-1.5' : 'mt-6 mb-3'} first:mt-0`}>{c}</h1>
+          <h1 className={`${sz.h1} font-bold text-[#124D8F] ${compact ? 'mt-3 mb-1.5' : 'mt-6 mb-3'} first:mt-0`}>{c}</h1>
         ),
         h2: ({ children: c }) => (
-          <h2 className={`${sz.h2} font-semibold text-gray-900 ${compact ? 'mt-3 mb-1.5' : 'mt-8 mb-3'} first:mt-0`}>{c}</h2>
+          <h2 className={`${sz.h2} font-semibold text-[#124D8F] ${compact ? 'mt-3 mb-1.5' : 'mt-8 mb-3'} first:mt-0`}>{c}</h2>
         ),
         h3: ({ children: c }) => (
-          <h3 className={`${sz.h3} font-semibold text-gray-900 ${compact ? 'mt-2 mb-1' : 'mt-6 mb-2'}`}>{c}</h3>
+          <h3 className={`${sz.h3} font-semibold text-[#124D8F] ${compact ? 'mt-2 mb-1' : 'mt-6 mb-2'}`}>{c}</h3>
         ),
         p: ({ children: c }) => (
           <p className={`text-gray-700 ${compact ? 'mb-1.5' : 'mb-3'} leading-relaxed ${sz.body}`}>
@@ -185,10 +185,10 @@ export function MarkdownContent({ children, sources = [], compact = false }: Pro
           </p>
         ),
         ul: ({ children: c }) => (
-          <ul className={`${compact ? 'mb-2 space-y-0.5 pl-4' : 'mb-4 space-y-1.5 pl-5'} list-disc marker:text-gray-300`}>{c}</ul>
+          <ul className={`${compact ? 'mb-2 space-y-0.5 pl-4' : 'mb-4 space-y-1.5 pl-5'} list-disc marker:text-[#FDCE3E]`}>{c}</ul>
         ),
         ol: ({ children: c }) => (
-          <ol className={`${compact ? 'mb-2 space-y-0.5 pl-4' : 'mb-4 space-y-1.5 pl-5'} list-decimal marker:text-gray-400`}>{c}</ol>
+          <ol className={`${compact ? 'mb-2 space-y-0.5 pl-4' : 'mb-4 space-y-1.5 pl-5'} list-decimal marker:text-[#124D8F]`}>{c}</ol>
         ),
         li: ({ children: c }) => (
           <li className={`text-gray-700 leading-relaxed ${sz.body} ${compact ? 'pl-0.5' : 'pl-1'}`}>
@@ -206,7 +206,7 @@ export function MarkdownContent({ children, sources = [], compact = false }: Pro
         },
         hr: () => <hr className={`${compact ? 'my-3' : 'my-6'} border-gray-200`} />,
         blockquote: ({ children: c }) => (
-          <blockquote className={`border-l-[3px] border-gray-300 ${compact ? 'pl-3 my-2' : 'pl-4 my-4'} text-gray-600 italic`}>
+          <blockquote className={`border-l-[3px] border-[#124D8F] ${compact ? 'pl-3 my-2' : 'pl-4 my-4'} text-gray-600 italic`}>
             {c}
           </blockquote>
         ),
@@ -215,7 +215,7 @@ export function MarkdownContent({ children, sources = [], compact = false }: Pro
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-600 underline decoration-blue-200 hover:decoration-blue-500 transition-colors"
+            className="text-[#124D8F] underline decoration-[#124D8F]/30 hover:decoration-[#124D8F] transition-colors"
           >
             {c}
           </a>

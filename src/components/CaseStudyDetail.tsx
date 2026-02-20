@@ -67,14 +67,14 @@ export function CaseStudyDetail() {
       <div className="max-w-5xl mx-auto px-6 py-8">
         <Link
           to="/case-studies"
-          className="inline-flex items-center gap-2 text-gray-700 hover:text-gray-900 mb-6 transition-colors"
+          className="inline-flex items-center gap-2 text-[#124D8F] hover:text-[#0e3d72] mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Case Studies
         </Link>
         <div className="flex flex-col items-center justify-center py-24 space-y-4">
-          <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
-          <p className="text-gray-500 font-medium">Loading case study…</p>
+          <Loader2 className="w-8 h-8 text-[#124D8F] animate-spin" />
+          <p className="text-gray-500 font-medium">Loading case study...</p>
         </div>
       </div>
     );
@@ -86,7 +86,7 @@ export function CaseStudyDetail() {
         <p className="text-gray-600">
           {fetchError || 'Case study not found.'}
         </p>
-        <Link to="/case-studies" className="text-gray-900 underline">
+        <Link to="/case-studies" className="text-[#124D8F] underline">
           Back to Case Studies
         </Link>
       </div>
@@ -181,18 +181,19 @@ export function CaseStudyDetail() {
     <div className="max-w-5xl mx-auto px-6 py-8">
       <Link
         to="/case-studies"
-        className="inline-flex items-center gap-2 text-gray-700 hover:text-gray-900 mb-6 transition-colors"
+        className="inline-flex items-center gap-2 text-[#124D8F] hover:text-[#0e3d72] mb-6 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Case Studies
       </Link>
 
       <div className="grid lg:grid-cols-3 gap-8">
-        {/* Main Content */}
         <div className="lg:col-span-2">
-          {/* Case Study Header */}
           <div className="mb-6">
-            <h1 className="text-3xl font-semibold text-gray-900 mb-3">
+            <h1
+              className="text-3xl text-[#124D8F] mb-3"
+              style={{ fontFamily: "'DM Serif Display', serif" }}
+            >
               {caseStudy.title}
             </h1>
             <div className="flex flex-wrap gap-2 mb-4">
@@ -204,7 +205,7 @@ export function CaseStudyDetail() {
             </div>
             <div className="grid sm:grid-cols-2 gap-4 mb-4">
               <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                <MapPin className="w-4 h-4 text-[#124D8F] mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-xs text-gray-500">Location</p>
                   <p className="text-sm text-gray-900">
@@ -213,7 +214,7 @@ export function CaseStudyDetail() {
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <Clock className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                <Clock className="w-4 h-4 text-[#124D8F] mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-xs text-gray-500">Timeframe</p>
                   <p className="text-sm text-gray-900">
@@ -222,7 +223,7 @@ export function CaseStudyDetail() {
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <Users className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                <Users className="w-4 h-4 text-[#124D8F] mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-xs text-gray-500">Demographic</p>
                   <p className="text-sm text-gray-900">
@@ -231,7 +232,7 @@ export function CaseStudyDetail() {
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <Target className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                <Target className="w-4 h-4 text-[#124D8F] mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-xs text-gray-500">Scale</p>
                   <p className="text-sm text-gray-900 capitalize">
@@ -247,7 +248,7 @@ export function CaseStudyDetail() {
                 href={caseStudy.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 mt-3 transition-colors"
+                className="inline-flex items-center gap-1 text-sm text-[#124D8F] hover:text-[#0e3d72] mt-3 transition-colors"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 View original source
@@ -255,25 +256,26 @@ export function CaseStudyDetail() {
             )}
           </div>
 
-          {/* Full Case Study Content */}
           {caseStudy.fullContent && (
             <div className="mb-8 border border-gray-200 rounded-lg bg-white">
               <button
                 onClick={() => setShowFullContent(!showFullContent)}
-                className="w-full flex items-center justify-between p-4 text-left cursor-pointer hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-between p-4 text-left cursor-pointer hover:bg-[#E4EFFC]/30 transition-colors"
               >
-                <h3 className="font-semibold text-gray-900">
+                <h3
+                  className="font-semibold text-[#124D8F]"
+                >
                   Full Case Study Content
                 </h3>
                 {showFullContent ? (
-                  <ChevronUp className="w-5 h-5 text-gray-500" />
+                  <ChevronUp className="w-5 h-5 text-[#124D8F]" />
                 ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-500" />
+                  <ChevronDown className="w-5 h-5 text-[#124D8F]" />
                 )}
               </button>
               {showFullContent && (
                 <div className="px-4 pb-4">
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                  <div className="p-4 bg-[#E4EFFC]/30 rounded-lg border border-[#124D8F]/10">
                     <MarkdownContent>{caseStudy.fullContent}</MarkdownContent>
                   </div>
                 </div>
@@ -281,10 +283,12 @@ export function CaseStudyDetail() {
             </div>
           )}
 
-          {/* Adapt to My Situation Flow */}
           <div className="border border-gray-200 rounded-lg bg-white shadow-sm">
             <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900 mb-1">
+              <h2
+                className="text-xl text-[#124D8F] mb-1"
+                style={{ fontFamily: "'DM Serif Display', serif" }}
+              >
                 Adapt to My Situation
               </h2>
               <p className="text-sm text-gray-500 mb-4">
@@ -294,7 +298,6 @@ export function CaseStudyDetail() {
             </div>
 
             <div className="p-6">
-              {/* Step: Info */}
               {adaptStep === 'info' && (
                 <div className="space-y-4">
                   <p className="text-gray-700">
@@ -316,11 +319,10 @@ export function CaseStudyDetail() {
                 </div>
               )}
 
-              {/* Step: Context */}
               {adaptStep === 'context' && (
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                    <h3 className="text-lg font-semibold text-[#124D8F] mb-1">
                       Describe your situation
                     </h3>
                     <p className="text-sm text-gray-600">
@@ -329,7 +331,7 @@ export function CaseStudyDetail() {
                     </p>
                   </div>
                   <textarea
-                    className="w-full min-h-[120px] p-4 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-y"
+                    className="w-full min-h-[120px] p-4 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent resize-y"
                     placeholder="e.g., We're a city agency looking to gather community input on a new parks plan targeting underserved neighborhoods..."
                     value={adaptContext}
                     onChange={(e) => setAdaptContext(e.target.value)}
@@ -337,7 +339,7 @@ export function CaseStudyDetail() {
                   <div className="flex justify-between">
                     <button
                       onClick={() => setAdaptStep('info')}
-                      className="text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+                      className="text-gray-600 hover:text-[#124D8F] transition-colors cursor-pointer"
                     >
                       Back
                     </button>
@@ -352,11 +354,10 @@ export function CaseStudyDetail() {
                 </div>
               )}
 
-              {/* Step: Constraints */}
               {adaptStep === 'constraints' && (
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                    <h3 className="text-lg font-semibold text-[#124D8F] mb-1">
                       What are your constraints?
                     </h3>
                     <p className="text-sm text-gray-600">
@@ -365,7 +366,7 @@ export function CaseStudyDetail() {
                     </p>
                   </div>
                   <textarea
-                    className="w-full min-h-[120px] p-4 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-y"
+                    className="w-full min-h-[120px] p-4 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent resize-y"
                     placeholder="e.g., Limited budget of $3,000, 2-month timeline, small team of 2, no existing online platform..."
                     value={adaptConstraints}
                     onChange={(e) => setAdaptConstraints(e.target.value)}
@@ -373,7 +374,7 @@ export function CaseStudyDetail() {
                   <div className="flex justify-between">
                     <button
                       onClick={() => setAdaptStep('context')}
-                      className="text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+                      className="text-gray-600 hover:text-[#124D8F] transition-colors cursor-pointer"
                     >
                       Back
                     </button>
@@ -388,12 +389,11 @@ export function CaseStudyDetail() {
                 </div>
               )}
 
-              {/* Step: Output */}
               {adaptStep === 'output' && (
                 <div className="space-y-4">
                   {isGenerating ? (
                     <div className="flex flex-col items-center justify-center py-16 space-y-4">
-                      <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                      <Loader2 className="w-8 h-8 text-[#124D8F] animate-spin" />
                       <p className="text-gray-600 font-medium">
                         Researching and adapting the case study...
                       </p>
@@ -405,7 +405,9 @@ export function CaseStudyDetail() {
                   ) : (
                     <>
                       <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <h3
+                          className="text-lg font-semibold text-[#124D8F]"
+                        >
                           Your Adapted Plan
                         </h3>
                         <div className="flex gap-2">
@@ -426,12 +428,12 @@ export function CaseStudyDetail() {
 
                       {isEditing ? (
                         <textarea
-                          className="w-full min-h-[350px] p-4 border border-gray-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-y"
+                          className="w-full min-h-[350px] p-4 border border-gray-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent resize-y"
                           value={editablePlan}
                           onChange={(e) => setEditablePlan(e.target.value)}
                         />
                       ) : (
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="p-4 bg-[#E4EFFC]/30 rounded-lg border border-[#124D8F]/10">
                           <MarkdownContent sources={sources}>
                             {editablePlan || adaptedPlan}
                           </MarkdownContent>
@@ -448,7 +450,7 @@ export function CaseStudyDetail() {
                         comprehensive plan, try the{' '}
                         <Link
                           to="/coach"
-                          className="text-gray-900 underline"
+                          className="text-[#124D8F] underline"
                         >
                           full coaching flow
                         </Link>
@@ -462,10 +464,9 @@ export function CaseStudyDetail() {
           </div>
         </div>
 
-        {/* Sidebar - Case Study Reference */}
         <div className="lg:col-span-1">
-          <div className="sticky top-6 border border-gray-200 rounded-lg p-6 bg-gray-50">
-            <h3 className="font-semibold text-gray-900 mb-3">
+          <div className="sticky top-6 border border-[#124D8F]/10 rounded-lg p-6 bg-[#E4EFFC]/30">
+            <h3 className="font-semibold text-[#124D8F] mb-3">
               Reference Case Study
             </h3>
             <h4 className="text-sm font-medium text-gray-900 mb-4">
@@ -478,7 +479,7 @@ export function CaseStudyDetail() {
                 <ul className="space-y-1">
                   {caseStudy.keyOutcomes.slice(0, 3).map((outcome, index) => (
                     <li key={index} className="text-gray-700 flex gap-2">
-                      <span className="text-gray-400 flex-shrink-0">
+                      <span className="text-[#FDCE3E] flex-shrink-0">
                         &bull;
                       </span>
                       <span>{outcome}</span>
@@ -496,7 +497,7 @@ export function CaseStudyDetail() {
                     .slice(0, 3)
                     .map((step, index) => (
                       <li key={index} className="text-gray-700 flex gap-2">
-                        <span className="text-gray-400 flex-shrink-0">
+                        <span className="text-[#124D8F] flex-shrink-0">
                           {index + 1}.
                         </span>
                         <span>{step}</span>
@@ -507,7 +508,7 @@ export function CaseStudyDetail() {
 
               <Link
                 to="/case-studies"
-                className="inline-block text-gray-900 underline hover:no-underline text-sm"
+                className="inline-block text-[#124D8F] underline hover:no-underline text-sm"
               >
                 View all case studies
               </Link>
@@ -529,10 +530,10 @@ function SourceList({ sources }: { sources: SourceDoc[] }) {
   if (uniqueSources.length === 0) return null;
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+    <div className="border border-[#124D8F]/10 rounded-lg p-4 bg-[#E4EFFC]/30">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors cursor-pointer w-full"
+        className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-[#124D8F] transition-colors cursor-pointer w-full"
       >
         {isExpanded ? (
           <ChevronUp className="w-4 h-4" />
@@ -549,7 +550,7 @@ function SourceList({ sources }: { sources: SourceDoc[] }) {
               key={i}
               className="flex items-start gap-2 text-sm text-gray-600"
             >
-              <span className="text-gray-400 mt-px flex-shrink-0">&bull;</span>
+              <span className="text-[#FDCE3E] mt-px flex-shrink-0">&bull;</span>
               <span>
                 {src.title}
                 {src.contentTypeLabel && (
@@ -563,7 +564,7 @@ function SourceList({ sources }: { sources: SourceDoc[] }) {
                     href={src.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-0.5 text-gray-600 hover:text-gray-900 ml-1"
+                    className="inline-flex items-center gap-0.5 text-[#124D8F] hover:text-[#0e3d72] ml-1"
                   >
                     <ExternalLink className="w-3 h-3" />
                   </a>

@@ -178,7 +178,7 @@ export function ChatBot() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gray-900 text-white rounded-full shadow-lg hover:bg-gray-800 transition-all flex items-center justify-center z-50 cursor-pointer hover:scale-105"
+          className="fixed bottom-6 right-6 w-14 h-14 bg-[#124D8F] text-white rounded-full shadow-lg hover:bg-[#0e3d72] transition-all flex items-center justify-center z-50 cursor-pointer hover:scale-105"
           aria-label="Open chat"
         >
           <MessageCircle className="w-6 h-6" />
@@ -187,23 +187,23 @@ export function ChatBot() {
 
       {isOpen && (
         <div className="fixed bottom-6 right-6 w-96 h-[520px] bg-white border border-gray-200 rounded-lg shadow-xl flex flex-col z-50">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg flex-shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[#124D8F]/10 bg-[#124D8F] rounded-t-lg flex-shrink-0">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-white/20 text-white rounded-full flex items-center justify-center">
                 <MessageCircle className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="font-medium text-gray-900 text-sm">
+                <h3 className="font-medium text-white text-sm">
                   Q&A Assistant
                 </h3>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-white/70">
                   Ask questions or upload a plan
                 </p>
               </div>
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+              className="text-white/70 hover:text-white transition-colors cursor-pointer"
               aria-label="Close chat"
             >
               <X className="w-5 h-5" />
@@ -222,16 +222,16 @@ export function ChatBot() {
                   <div
                     className={`rounded-lg px-3 py-2 text-sm ${
                       message.type === 'user'
-                        ? 'bg-gray-900 text-white'
-                        : 'bg-gray-100 text-gray-900'
+                        ? 'bg-[#124D8F] text-white'
+                        : 'bg-[#E4EFFC] text-gray-900'
                     }`}
                   >
                     {message.attachment && (
                       <div
                         className={`flex items-center gap-1.5 text-xs mb-1.5 pb-1.5 border-b ${
                           message.type === 'user'
-                            ? 'border-gray-700 text-gray-300'
-                            : 'border-gray-300 text-gray-500'
+                            ? 'border-white/30 text-white/70'
+                            : 'border-[#124D8F]/20 text-gray-500'
                         }`}
                       >
                         <Paperclip className="w-3 h-3" />
@@ -265,7 +265,7 @@ export function ChatBot() {
           </div>
 
           {uploadedFile && (
-            <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs">
+            <div className="px-3 py-2 bg-[#E4EFFC]/50 border-t border-gray-200 flex items-center justify-between text-xs">
               <div className="flex items-center gap-1.5 text-gray-600">
                 <Paperclip className="w-3 h-3" />
                 {uploadedFile}
@@ -290,7 +290,7 @@ export function ChatBot() {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-2 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+                className="px-2 py-2 text-gray-500 hover:text-[#124D8F] hover:bg-[#E4EFFC] rounded-md transition-colors cursor-pointer"
                 title="Upload a plan"
                 aria-label="Upload a plan"
               >
@@ -302,13 +302,13 @@ export function ChatBot() {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask a question..."
-                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent"
                 disabled={isLoading}
               />
               <button
                 onClick={handleSendMessage}
                 disabled={(!inputValue.trim() && !uploadedFile) || isLoading}
-                className="px-3 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="px-3 py-2 bg-[#124D8F] text-white rounded-md hover:bg-[#0e3d72] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 aria-label="Send message"
               >
                 {isLoading ? (
@@ -338,7 +338,7 @@ function SourceList({ sources }: { sources: SourceDoc[] }) {
     <div className="mt-1.5">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+        className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#124D8F] transition-colors cursor-pointer"
       >
         {isExpanded ? (
           <ChevronUp className="w-3 h-3" />
@@ -365,7 +365,7 @@ function SourceList({ sources }: { sources: SourceDoc[] }) {
                     href={src.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-0.5 text-gray-600 hover:text-gray-900 ml-1"
+                    className="inline-flex items-center gap-0.5 text-[#124D8F] hover:text-[#0e3d72] ml-1"
                   >
                     <ExternalLink className="w-2.5 h-2.5" />
                   </a>
