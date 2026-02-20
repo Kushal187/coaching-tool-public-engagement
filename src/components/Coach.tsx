@@ -617,7 +617,10 @@ export function Coach() {
       {/* Header */}
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+          <h1
+            className="text-3xl text-[#124D8F] mb-2"
+            style={{ fontFamily: "'DM Serif Display', serif" }}
+          >
             Coaching Session
           </h1>
           <p className="text-gray-600">
@@ -626,7 +629,7 @@ export function Coach() {
         </div>
         <button
           onClick={handleReset}
-          className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-[#E4EFFC] rounded-md transition-colors cursor-pointer"
         >
           <RefreshCw className="w-4 h-4" />
           Reset
@@ -870,7 +873,10 @@ export function Coach() {
           {currentPhase === 'midway-existing-work' && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                <h2
+                  className="text-2xl text-[#124D8F] mb-2"
+                  style={{ fontFamily: "'DM Serif Display', serif" }}
+                >
                   What have you already done?
                 </h2>
                 <p className="text-gray-600">
@@ -880,7 +886,7 @@ export function Coach() {
                 </p>
               </div>
               <textarea
-                className="w-full min-h-[140px] p-4 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-y"
+                className="w-full min-h-[140px] p-4 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent resize-y"
                 placeholder="e.g., We held three community workshops with ~200 participants, ran an online survey with 500 responses, partnered with two local organizations..."
                 value={ctx.existingWork}
                 onChange={(e) =>
@@ -890,7 +896,7 @@ export function Coach() {
               <div className="flex items-center justify-between pt-2">
                 <button
                   onClick={goBack}
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+                  className="flex items-center gap-2 text-gray-600 hover:text-[#124D8F] transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   Back
@@ -911,7 +917,10 @@ export function Coach() {
           {currentPhase === 'midway-branch' && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                <h2
+                  className="text-2xl text-[#124D8F] mb-2"
+                  style={{ fontFamily: "'DM Serif Display', serif" }}
+                >
                   How can we help you next?
                 </h2>
                 <p className="text-gray-600">
@@ -925,11 +934,11 @@ export function Coach() {
                     setCurrentPhase('followup');
                     fetchFollowUpQuestions({ ...ctx, midwayChoice: 'plan' });
                   }}
-                  className="w-full text-left p-6 border border-gray-200 rounded-lg hover:border-gray-900 hover:shadow-md transition-all group cursor-pointer"
+                  className="w-full text-left p-6 border border-gray-200 rounded-lg hover:border-[#124D8F] hover:shadow-md transition-all group cursor-pointer"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      <h3 className="text-lg font-semibold text-[#124D8F] mb-1">
                         Generate a plan that builds on my progress
                       </h3>
                       <p className="text-gray-600 text-sm">
@@ -937,7 +946,7 @@ export function Coach() {
                         already done and focuses on next steps.
                       </p>
                     </div>
-                    <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-gray-900 group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-[#124D8F] group-hover:translate-x-1 transition-all" />
                   </div>
                 </button>
                 <button
@@ -956,11 +965,11 @@ export function Coach() {
                       new CustomEvent('open-chatbot', { detail: { contextMessage } }),
                     );
                   }}
-                  className="w-full text-left p-6 border border-gray-200 rounded-lg hover:border-gray-900 hover:shadow-md transition-all group cursor-pointer"
+                  className="w-full text-left p-6 border border-gray-200 rounded-lg hover:border-[#124D8F] hover:shadow-md transition-all group cursor-pointer"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      <h3 className="text-lg font-semibold text-[#124D8F] mb-1">
                         Ask questions about my engagement
                       </h3>
                       <p className="text-gray-600 text-sm">
@@ -968,14 +977,14 @@ export function Coach() {
                         get targeted advice on specific challenges.
                       </p>
                     </div>
-                    <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-gray-900 group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-[#124D8F] group-hover:translate-x-1 transition-all" />
                   </div>
                 </button>
               </div>
               <div className="pt-2">
                 <button
                   onClick={goBack}
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+                  className="flex items-center gap-2 text-gray-600 hover:text-[#124D8F] transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   Back
@@ -998,7 +1007,10 @@ export function Coach() {
               ) : followUpQuestions.length > 0 ? (
                 <>
                   <div>
-                    <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                    <h2
+                      className="text-2xl text-[#124D8F] mb-2"
+                      style={{ fontFamily: "'DM Serif Display', serif" }}
+                    >
                       A few quick follow-ups
                     </h2>
                     <p className="text-gray-600">
@@ -1013,7 +1025,7 @@ export function Coach() {
                         </label>
                         <p className="text-xs text-gray-500 italic">{fq.why}</p>
                         <textarea
-                          className="w-full min-h-[80px] p-3 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-y text-sm"
+                          className="w-full min-h-[80px] p-3 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent resize-y text-sm"
                           placeholder="Your answer..."
                           value={ctx.followUpAnswers[fq.id] || ''}
                           onChange={(e) =>
@@ -1032,7 +1044,7 @@ export function Coach() {
                   <div className="flex items-center justify-between pt-2">
                     <button
                       onClick={goBack}
-                      className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+                      className="flex items-center gap-2 text-gray-600 hover:text-[#124D8F] transition-colors cursor-pointer"
                     >
                       <ChevronLeft className="w-4 h-4" />
                       Back
@@ -1078,7 +1090,10 @@ export function Coach() {
                 <>
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-2xl font-semibold text-gray-900 mb-1">
+                      <h2
+                        className="text-2xl text-[#124D8F] mb-1"
+                        style={{ fontFamily: "'DM Serif Display', serif" }}
+                      >
                         Your Engagement Plan
                       </h2>
                       <p className="text-gray-500 text-sm">
@@ -1103,12 +1118,12 @@ export function Coach() {
 
                   {isEditing ? (
                     <textarea
-                      className="w-full min-h-[400px] p-4 border border-gray-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-y"
+                      className="w-full min-h-[400px] p-4 border border-gray-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent resize-y"
                       value={editablePlan}
                       onChange={(e) => setEditablePlan(e.target.value)}
                     />
                   ) : (
-                    <div className="p-6 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="p-6 bg-[#E4EFFC]/30 rounded-lg border border-[#124D8F]/10">
                       <MarkdownContent sources={planSources}>
                         {editablePlan || generatedPlan}
                       </MarkdownContent>
@@ -1139,6 +1154,17 @@ export function Coach() {
                     )}
 
                     {!scoringLoading && recommendedStudies.length > 0 && (
+                  {recommendedStudies.length > 0 && (
+                    <div className="mt-8">
+                      <h3
+                        className="text-lg font-semibold text-[#124D8F] mb-1"
+                      >
+                        Recommended Case Studies
+                      </h3>
+                      <p className="text-sm text-gray-500 mb-4">
+                        Ranked by relevance to your context, constraints, and
+                        timeline
+                      </p>
                       <div className="space-y-3">
                         {recommendedStudies.map(({ study, score, reason }, idx) => (
                           <Link
@@ -1147,11 +1173,11 @@ export function Coach() {
                             className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-400 hover:shadow-sm transition-all group"
                           >
                             <div className="flex items-start gap-4">
-                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 text-sm font-semibold flex-shrink-0">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#E4EFFC] text-[#124D8F] text-sm font-semibold flex-shrink-0">
                                 {idx + 1}
                               </div>
                               <div>
-                                <h4 className="font-medium text-gray-900 group-hover:underline">
+                                <h4 className="font-medium text-[#124D8F] group-hover:underline">
                                   {study.title}
                                 </h4>
                                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
@@ -1190,7 +1216,7 @@ export function Coach() {
                                   {Math.min(Math.round(score), 99)}%
                                 </div>
                               </div>
-                              <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-gray-900 transition-colors" />
+                              <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-[#124D8F] transition-colors" />
                             </div>
                           </Link>
                         ))}
@@ -1260,10 +1286,15 @@ function SingleSelectQuestion({
   return (
     <div className="space-y-6">
       <div>
-        <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+        <div className="text-xs font-medium text-[#124D8F]/50 uppercase tracking-wider mb-1">
           Question {number} of 10
         </div>
-        <h2 className="text-2xl font-semibold text-gray-900 mb-2">{title}</h2>
+        <h2
+          className="text-2xl text-[#124D8F] mb-2"
+          style={{ fontFamily: "'DM Serif Display', serif" }}
+        >
+          {title}
+        </h2>
         <p className="text-gray-600">{subtitle}</p>
       </div>
 
@@ -1277,14 +1308,14 @@ function SingleSelectQuestion({
             }}
             className={`w-full text-left px-5 py-3.5 border rounded-lg transition-all group cursor-pointer ${
               value === opt
-                ? 'border-gray-900 bg-gray-50 shadow-sm'
-                : 'border-gray-200 hover:border-gray-400'
+                ? 'border-[#124D8F] bg-[#E4EFFC] shadow-sm'
+                : 'border-gray-200 hover:border-[#124D8F]/40'
             }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-gray-900">{opt}</span>
               {value === opt ? (
-                <Check className="w-4 h-4 text-gray-900 flex-shrink-0" />
+                <Check className="w-4 h-4 text-[#124D8F] flex-shrink-0" />
               ) : (
                 <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 flex-shrink-0" />
               )}
@@ -1298,8 +1329,8 @@ function SingleSelectQuestion({
               onClick={() => setShowOtherInput(true)}
               className={`w-full text-left px-5 py-3.5 border rounded-lg transition-all cursor-pointer ${
                 showOtherInput || value === 'Other'
-                  ? 'border-gray-900 bg-gray-50 shadow-sm'
-                  : 'border-gray-200 hover:border-gray-400'
+                  ? 'border-[#124D8F] bg-[#E4EFFC] shadow-sm'
+                  : 'border-gray-200 hover:border-[#124D8F]/40'
               }`}
             >
               <span className="text-gray-900">Other</span>
@@ -1308,7 +1339,7 @@ function SingleSelectQuestion({
               <div className="flex gap-2 ml-4">
                 <input
                   type="text"
-                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent"
                   placeholder={otherPlaceholder}
                   value={otherValue}
                   onChange={(e) => onOtherChange?.(e.target.value)}
@@ -1334,7 +1365,7 @@ function SingleSelectQuestion({
         <div className="pt-2">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+            className="flex items-center gap-2 text-gray-600 hover:text-[#124D8F] transition-colors cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
             Back
@@ -1393,10 +1424,15 @@ function MultiSelectQuestion({
   return (
     <div className="space-y-6">
       <div>
-        <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+        <div className="text-xs font-medium text-[#124D8F]/50 uppercase tracking-wider mb-1">
           Question {number} of 10
         </div>
-        <h2 className="text-2xl font-semibold text-gray-900 mb-2">{title}</h2>
+        <h2
+          className="text-2xl text-[#124D8F] mb-2"
+          style={{ fontFamily: "'DM Serif Display', serif" }}
+        >
+          {title}
+        </h2>
         <p className="text-gray-600">{subtitle}</p>
       </div>
 
@@ -1409,15 +1445,15 @@ function MultiSelectQuestion({
               onClick={() => toggle(opt)}
               className={`w-full text-left px-5 py-3.5 border rounded-lg transition-all cursor-pointer ${
                 selected
-                  ? 'border-gray-900 bg-gray-50 shadow-sm'
-                  : 'border-gray-200 hover:border-gray-400'
+                  ? 'border-[#124D8F] bg-[#E4EFFC] shadow-sm'
+                  : 'border-gray-200 hover:border-[#124D8F]/40'
               }`}
             >
               <div className="flex items-center gap-3">
                 <div
                   className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
                     selected
-                      ? 'bg-gray-900 border-gray-900'
+                      ? 'bg-[#124D8F] border-[#124D8F]'
                       : 'border-gray-300'
                   }`}
                 >
@@ -1438,15 +1474,15 @@ function MultiSelectQuestion({
               }}
               className={`w-full text-left px-5 py-3.5 border rounded-lg transition-all cursor-pointer ${
                 otherSelected
-                  ? 'border-gray-900 bg-gray-50 shadow-sm'
-                  : 'border-gray-200 hover:border-gray-400'
+                  ? 'border-[#124D8F] bg-[#E4EFFC] shadow-sm'
+                  : 'border-gray-200 hover:border-[#124D8F]/40'
               }`}
             >
               <div className="flex items-center gap-3">
                 <div
                   className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
                     otherSelected
-                      ? 'bg-gray-900 border-gray-900'
+                      ? 'bg-[#124D8F] border-[#124D8F]'
                       : 'border-gray-300'
                   }`}
                 >
@@ -1461,7 +1497,7 @@ function MultiSelectQuestion({
               <div className="ml-8">
                 <input
                   type="text"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent"
                   placeholder={otherPlaceholder}
                   value={otherValue}
                   onChange={(e) => onOtherChange?.(e.target.value)}
@@ -1477,7 +1513,7 @@ function MultiSelectQuestion({
         {onBack ? (
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+            className="flex items-center gap-2 text-gray-600 hover:text-[#124D8F] transition-colors cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
             Back
@@ -1506,10 +1542,10 @@ function PlanSourceList({ sources }: { sources: SourceDoc[] }) {
   if (uniqueSources.length === 0) return null;
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+    <div className="border border-[#124D8F]/10 rounded-lg p-4 bg-[#E4EFFC]/30">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors cursor-pointer w-full"
+        className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-[#124D8F] transition-colors cursor-pointer w-full"
       >
         {isExpanded ? (
           <ChevronUp className="w-4 h-4" />
@@ -1540,7 +1576,7 @@ function PlanSourceList({ sources }: { sources: SourceDoc[] }) {
                     href={src.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-0.5 text-gray-600 hover:text-gray-900 ml-1"
+                    className="inline-flex items-center gap-0.5 text-gray-600 hover:text-[#124D8F] ml-1"
                   >
                     <ExternalLink className="w-3 h-3" />
                   </a>
