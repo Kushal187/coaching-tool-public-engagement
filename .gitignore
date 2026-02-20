@@ -5,8 +5,6 @@ node_modules/
 package-lock.json
 .netlify/
 
-# Override Python template's lib/ exclusion — our lib/ has source code
-!lib/
 
 # Docling-converted Markdown files (generated from PDFs)
 documents/converted/
@@ -34,6 +32,8 @@ eggs/
 lib/
 lib64/
 parts/
+# Override Python template's lib/ exclusion — our lib/ has source code
+!lib/
 sdist/
 var/
 wheels/
