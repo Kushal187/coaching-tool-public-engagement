@@ -19,9 +19,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MODEL = process.env.CHATBOT_MODEL || 'gpt-4.1';
-const MAX_ITERATIONS = 3;
+const MAX_ITERATIONS = 5;
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -489,6 +489,161 @@ app.post('/api/adapt-case-study', async (req, res) => {
       return res.status(500).json({ error: 'An error occurred while adapting the case study.' });
     }
     res.end();
+  }
+});
+
+// ── POST /api/score-case-studies ─────────────────────────────
+
+const SCORE_CASE_STUDIES_PROMPT = `You are an expert at matching public engagement case studies to practitioner needs. You have access to a knowledge base of engagement resources, case studies, and guides.
+
+PROCESS:
+1. Read the practitioner's context carefully — note every field (issue area, goal, audience, timeline, resources, constraint, stuck point, process stage).
+2. Search the knowledge base AT LEAST 4 TIMES with varied queries:
+   - Search 1: Focus on the issue area + engagement goal combination
+   - Search 2: Focus on the target audience + timeline/resource constraints
+   - Search 3: Focus on the stuck point or biggest challenge mentioned
+   - Search 4: Focus on the engagement methods or approaches relevant to the process stage
+   Use different keywords each time — do NOT repeat similar queries.
+3. For each case study, compute a score using the WEIGHTED RUBRIC below. Sum the points across all dimensions.
+
+WEIGHTED SCORING RUBRIC (total = 100 points):
+
+1. Issue/Topic Alignment (20 points)
+   - 20: Case study addresses the same issue area (e.g., budget → budget, crisis → crisis)
+   - 12: Related issue area (e.g., infrastructure → environment)
+   - 5: Loosely related or transferable methods
+   - 0: Completely unrelated topic
+
+2. Engagement Goal Match (20 points)
+   - 20: Same primary goal (e.g., both aim to gather feedback on a draft plan)
+   - 12: Related goal (e.g., deliberation vs. idea gathering)
+   - 5: Tangentially related goal
+   - 0: Different purpose entirely
+
+3. Audience/Demographic Fit (15 points)
+   - 15: Same target audience (e.g., both target underrepresented communities)
+   - 10: Overlapping audiences (e.g., case targets youth, practitioner targets hard-to-reach broadly)
+   - 5: Different audience but methods are transferable
+   - 0: Completely different audience with non-transferable approach
+
+4. Timeline & Scale Compatibility (15 points)
+   - 15: Case study operated within a similar timeframe and scale
+   - 10: Somewhat comparable (e.g., case was 6 months, practitioner has 3 months)
+   - 5: Different scale but methods could be adapted
+   - 0: Vastly different timeline (e.g., multi-year vs. 4 weeks)
+
+5. Resource & Constraint Alignment (15 points)
+   - 15: Case study faced similar resource constraints and biggest challenge
+   - 10: Partially similar constraints
+   - 5: Different constraints but lessons are still applicable
+   - 0: Case study had vastly different resources (e.g., national budget vs. solo practitioner)
+
+6. Stuck Point / Process Stage Relevance (15 points)
+   - 15: Case study directly addresses the practitioner's stuck point AND is useful for their process stage
+   - 10: Addresses the stuck point OR process stage well
+   - 5: Loosely relevant to their challenge
+   - 0: Does not help with their specific challenge
+
+RULES:
+- You MUST perform at least 4 knowledge base searches before scoring.
+- Apply the rubric mechanically — add up the points for each dimension.
+- Every score reason MUST reference which rubric dimensions drove the score (e.g., "Issue: 20, Goal: 12, Audience: 10, Timeline: 15, Resources: 5, Stuck: 10 = 72").
+- A perfect-match case should score 90-100. A decent match: 60-80. A weak match: 30-50. Irrelevant: below 30.
+- Do NOT compress scores into a narrow range. Use the full 0-100 spectrum.
+- Only return case studies that score 30 or above.
+
+OUTPUT FORMAT: Return ONLY valid JSON, no markdown fences. Use this exact structure:
+{"scores": [{"id": "case-study-id", "score": 72, "reason": "Issue: 20, Goal: 12, Audience: 10, Timeline: 15, Resources: 5, Stuck: 10. [One sentence summary of why]."}]}
+
+Return scored case studies sorted from most to least relevant.`;
+
+app.post('/api/score-case-studies', async (req, res) => {
+  const { userContext, plan, caseStudies } = req.body;
+
+  if (!userContext || !caseStudies || !Array.isArray(caseStudies)) {
+    return res.status(400).json({ error: 'Missing required fields: userContext, caseStudies.' });
+  }
+
+  const startTime = Date.now();
+  console.log('\n[score-case-studies] ── Request received ──');
+  console.log(`[score-case-studies] Case studies to score: ${caseStudies.length}`);
+
+  try {
+    const contextSummary = [
+      `Issue area: ${resolveOther(userContext.issueArea, userContext.issueAreaOther)}`,
+      `Primary goal: ${resolveOther(userContext.primaryGoal, userContext.primaryGoalOther)}`,
+      `Target audience: ${resolveArrayOther(userContext.audience, userContext.audienceOther)}`,
+      `Timeline: ${userContext.timeline}`,
+      `Resources: ${resolveArrayOther(userContext.resources, userContext.resourcesOther)}`,
+      `Biggest constraint: ${resolveOther(userContext.biggestConstraint, userContext.biggestConstraintOther)}`,
+      `AI comfort: ${userContext.aiComfort}`,
+      `Success criteria: ${resolveOther(userContext.successLooksLike, userContext.successOther)}`,
+      `Stuck point: ${resolveOther(userContext.stuckPoint, userContext.stuckPointOther)}`,
+      `Process stage: ${userContext.processStage}`,
+      userContext.existingWork ? `Existing work: ${userContext.existingWork}` : '',
+    ].filter(Boolean).join('\n');
+
+    console.log(`[score-case-studies] Context:\n${contextSummary}`);
+
+    const caseStudySummaries = caseStudies.map((cs) => (
+      `- ID: ${cs.id} | Title: "${cs.title}" | Location: ${cs.location} | Scale: ${cs.scale} | ` +
+      `Timeframe: ${cs.timeframe} | Demographic: ${cs.demographic} | Tags: ${cs.tags?.join(', ')} | ` +
+      `Summary: ${cs.summary}`
+    )).join('\n');
+
+    const userMessage = [
+      `Score the following case studies for relevance to this practitioner's situation.`,
+      ``,
+      `## Practitioner Context`,
+      contextSummary,
+      plan ? `\n## Generated Plan (excerpt)\n${plan.slice(0, 1500)}` : '',
+      ``,
+      `## Case Studies to Score`,
+      caseStudySummaries,
+    ].join('\n');
+
+    console.log(`[score-case-studies] Calling agent loop (model: ${MODEL}, max iterations: ${MAX_ITERATIONS})...`);
+
+    const result = await runAgentLoop({
+      systemPrompt: SCORE_CASE_STUDIES_PROMPT,
+      userMessage,
+      tools: agentToolDefinitions,
+      toolImpls: agentToolImplementations,
+      model: MODEL,
+      maxIterations: MAX_ITERATIONS,
+      temperature: 0,
+    });
+
+    const agentMs = Date.now() - startTime;
+    console.log(`[score-case-studies] Agent completed in ${agentMs}ms`);
+
+    if (!result) {
+      console.error('[score-case-studies] Agent returned no response');
+      return res.status(500).json({ error: 'Agent returned no response.' });
+    }
+
+    console.log(`[score-case-studies] Raw agent response:\n${result}`);
+
+    const cleaned = result.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    let scores;
+    try {
+      const parsed = JSON.parse(cleaned);
+      scores = Array.isArray(parsed) ? parsed : parsed.scores || parsed.results || [];
+    } catch {
+      console.error('[score-case-studies] Failed to parse response as JSON:', cleaned);
+      return res.status(500).json({ error: 'Failed to parse scoring response.' });
+    }
+
+    console.log(`[score-case-studies] ── Results (${scores.length} scored) ──`);
+    scores.forEach((s, i) => {
+      console.log(`  ${i + 1}. [${s.score}%] ${s.id} — ${s.reason}`);
+    });
+    console.log(`[score-case-studies] Total time: ${Date.now() - startTime}ms\n`);
+
+    res.json({ scores });
+  } catch (error) {
+    console.error(`[score-case-studies] Error after ${Date.now() - startTime}ms:`, error);
+    res.status(500).json({ error: 'Failed to score case studies.' });
   }
 });
 
