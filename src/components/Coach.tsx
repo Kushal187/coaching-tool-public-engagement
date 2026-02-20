@@ -1136,7 +1136,7 @@ export function Coach() {
 
                   {/* Recommended Case Studies */}
                   <div className="mt-8">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                    <h3 className="text-lg font-semibold text-[#124D8F] mb-1">
                       Recommended Case Studies
                     </h3>
                     <p className="text-sm text-gray-500 mb-4">
@@ -1154,17 +1154,6 @@ export function Coach() {
                     )}
 
                     {!scoringLoading && recommendedStudies.length > 0 && (
-                  {recommendedStudies.length > 0 && (
-                    <div className="mt-8">
-                      <h3
-                        className="text-lg font-semibold text-[#124D8F] mb-1"
-                      >
-                        Recommended Case Studies
-                      </h3>
-                      <p className="text-sm text-gray-500 mb-4">
-                        Ranked by relevance to your context, constraints, and
-                        timeline
-                      </p>
                       <div className="space-y-3">
                         {recommendedStudies.map(({ study, score, reason }, idx) => (
                           <Link
