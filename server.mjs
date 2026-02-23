@@ -56,9 +56,10 @@ PROCESS:
 1. Search for engagement methods that match the user's stated goal and target audience.
 2. Search for case studies that relate to the user's engagement topic or issue area.
 3. Search for strategies specifically addressing the user's biggest constraint.
-4. If the user mentioned a specific process stage (e.g., mid-process), search for stage-specific guidance.
-5. If you find a particularly relevant document, use get_document_details to retrieve the full context.
-6. Synthesise all evidence into a structured engagement plan.
+4. Search for practical guidance specifically addressing the user's stated stuck point (e.g., if they said "reaching underrepresented groups," search for outreach strategies for hard-to-reach populations).
+5. If the user mentioned a specific process stage (e.g., mid-process), search for stage-specific guidance.
+6. If you find a particularly relevant document, use get_document_details to retrieve the full context.
+7. Synthesise all evidence into a structured engagement plan.
 
 RULES:
 - Search at least 3 times with different queries covering: (1) engagement methods for the goal, (2) relevant case studies, (3) constraint-specific strategies.
@@ -68,8 +69,14 @@ RULES:
 - Tailor the plan to the user's timeline, resources, and AI comfort level.
 - If the user is mid-process, Phase 1 should focus on Assessment & Course Correction rather than initial design.
 - When the user provided follow-up answers, integrate that additional context throughout the plan.
+- Every step in the plan must follow a "verb + specific action" format, specific enough that the practitioner can act on it without further research. Instead of "Conduct outreach to underrepresented communities," write "Identify 3 trusted community organizations in your area, draft a one-paragraph partnership ask, and schedule introductory meetings within [timeframe]." Directly below each step, add an indented line: "  - *Deliverable:* [concrete, tangible output of this step]" (e.g., "  - *Deliverable:* Confirmed partnerships with at least 2 community organizations").
+- The user's stated stuck point is their most urgent need. Within the most relevant phase, begin with a bold-labeled sub-point — **Addressing your core challenge: [stuck point]** — that directly tackles it with concrete, cited guidance. Do not bury this across the plan; make it immediately visible.
+- Scale the plan's density to the user's stated timeline. For timelines under 4 weeks: compress Phase 1 to 2-3 essential setup steps and merge Phases 2-3 where possible. For 1-3 months: keep all three phases but tighten sequencing. For 6-12 months: include iterative engagement cycles within Phase 2 and interim check-ins. Always include specific time estimates (e.g., "Week 1-2") anchored to the user's timeline.
+- Within each phase, group steps under two subtitle headings: **Essential** (the minimum viable engagement — what the practitioner must do even if everything else falls away; limit to 3-4 steps per phase) and **If Resources Allow** (additional steps that strengthen the engagement but can be deferred). Use #### for these subtitles within each phase.
+- Include at least one decision point or contingency per phase, formatted as: "**If [risk scenario]:** [concrete pivot or fallback action]." Ground these in evidence from the knowledge base where possible (e.g., "If turnout is below expectations, [Source: X] recommends shifting to...").
+- In the Sources section, list every cited document as a markdown hyperlink using the document's source URL: [Document Name](source_url). If no URL is available for a document, list it as plain text with its content type.
 
-OUTPUT FORMAT (use markdown):
+OUTPUT FORMAT (use markdown, follow this indentation exactly):
 
 ## Your Engagement Plan
 
@@ -77,14 +84,36 @@ OUTPUT FORMAT (use markdown):
 
 ### Phase 1: Preparation & Design
 (or "Phase 1: Assessment & Course Correction" if the user is mid-process)
-- [Concrete steps with citations]
+
+#### Essential
+- [Concrete step with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output of this step]
+- [Next step with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output]
+
+#### If Resources Allow
+- [Additional step with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output]
 
 ### Phase 2: Engagement Implementation
-- [Methods, activities, and approaches with citations]
-- [Timeline-aware sequencing]
+
+#### Essential
+- [Method or activity with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output]
+
+#### If Resources Allow
+- [Additional method with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output]
 
 ### Phase 3: Synthesis & Closing the Loop
-- [How to analyse results, report back to participants, and maintain trust — with citations]
+
+#### Essential
+- [Step for analysing results, reporting back, maintaining trust — with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output]
+
+#### If Resources Allow
+- [Additional step with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output]
 
 ### AI Integration Guidance
 - [Specific ways AI can support the engagement, calibrated to the user's comfort level]
@@ -94,7 +123,7 @@ OUTPUT FORMAT (use markdown):
 - [Metrics and evaluation approaches aligned to the user's success criteria, with citations]
 
 ### Sources
-[List every document cited in the plan, with its content type]`;
+[List every document cited in the plan as a markdown hyperlink: [Document Name](source_url). Include content type.]`;
 
 const GENERATE_QUESTIONS_PROMPT = `You are an expert public engagement consultant reviewing a user's questionnaire responses before generating their engagement plan.
 
@@ -144,17 +173,24 @@ RULES:
   (a) Elements from the case study that transfer directly to the user's situation
   (b) Elements that need modification and how to modify them
   (c) New elements needed for the user's specific context
-- Every adaptation recommendation MUST cite its source inline: [Source: Document Name]
+- Every adaptation recommendation MUST cite its source inline as a hyperlink: [Source: [Document Name](source_url)]. If no URL is available, fall back to plain text: [Source: Document Name].
 - Flag risks grounded in what similar engagements have experienced.
 - If the user's situation differs significantly from available evidence, explicitly state limitations.
 - Do NOT recommend anything you cannot ground in a retrieved document.
+- Every step in the phased plan must be specific and actionable. Directly below each step, add an indented line: "  - *Deliverable:* [concrete, tangible output of this step]" (e.g., "  - *Deliverable:* Revised outreach flyer adapted to your community's demographics").
+- If the user's free-text input is sparse or omits key details (timeline, audience, scale, resources), explicitly state your assumptions at the top of the plan under **Your Context** (e.g., "You did not mention a timeline; based on your constraints, this plan assumes a 2-3 month window. Adjust phase durations if your timeline differs."). Infer reasonable defaults from the case study's parameters and the user's constraints. Never silently guess — always surface assumptions so the practitioner can correct them.
+- The adapted plan must visibly diverge from the original case study. In the "What Needs Modification" section, identify at least 3 concrete, substantive changes — not cosmetic substitutions like swapping city names. If the user's scale, timeline, or audience differs from the case study, those differences must drive structural changes in the phased plan, not just wording changes.
+- Every phase must include a specific time estimate (e.g., "Weeks 1-2," "Month 1"). If the user stated a timeline, anchor to it. If they didn't, infer one from their constraints and state the assumption. If the case study's timeframe is significantly longer or shorter than the user's apparent situation, explicitly describe how to compress or expand each phase.
+- Within each phase, group steps under two subtitle headings: **Essential** (the minimum viable adaptation — what the practitioner must do even with severe constraints; limit to 2-3 steps per phase) and **If Resources Allow** (additional steps that strengthen the adaptation but can be deferred). Use #### for these subtitles within each phase.
+- Include at least one contingency per phase: "**If [scenario]:** [fallback]." Prioritize risks that stem from the differences between the case study's context and the user's context (e.g., "The original case study had 6 months; if your compressed timeline causes low turnout at the first session, consider...").
+- In the Sources section, list every cited document as a markdown hyperlink using the document's source URL: [Document Name](source_url). If no URL is available for a document, list it as plain text with its content type.
 
-OUTPUT FORMAT (use markdown):
+OUTPUT FORMAT (use markdown, follow this indentation exactly):
 ## Adapted Plan: Based on [Case Study Title]
 
-**Your Context:** [summary]
-**Your Constraints:** [summary]
-**Reference Case Study:** [title and location]
+- **Your Context:** [summary]
+- **Your Constraints:** [summary]
+- **Reference Case Study:** [title and location]
 
 ### What Transfers Directly
 - [elements that can be used as-is, with citations]
@@ -166,19 +202,42 @@ OUTPUT FORMAT (use markdown):
 - [additions based on user's unique situation, with citations]
 
 ### Phase 1: Setup
-- [adapted steps with citations]
+
+#### Essential
+- [Adapted step with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output of this step]
+- [Next step with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output]
+
+#### If Resources Allow
+- [Additional step with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output]
 
 ### Phase 2: Implementation
-- [adapted steps with citations]
+
+#### Essential
+- [Adapted step with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output]
+
+#### If Resources Allow
+- [Additional step with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output]
 
 ### Phase 3: Evaluation & Outcomes
-- [adapted outcomes with citations]
+
+#### Essential
+- [Adapted step with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output]
+
+#### If Resources Allow
+- [Additional step with citation] [Source: Document Name]
+  - *Deliverable:* [tangible output]
 
 ### Risks & Considerations
 - [risks grounded in evidence, with citations]
 
 ### Sources
-[list all cited documents]`;
+[List every cited document as a markdown hyperlink: [Document Name](source_url). Include content type.]`;
 
 // ── Shared Helpers ──────────────────────────────────────────
 
@@ -550,7 +609,7 @@ RULES:
 - Every score reason MUST reference which rubric dimensions drove the score (e.g., "Issue: 20, Goal: 12, Audience: 10, Timeline: 15, Resources: 5, Stuck: 10 = 72").
 - A perfect-match case should score 90-100. A decent match: 60-80. A weak match: 30-50. Irrelevant: below 30.
 - Do NOT compress scores into a narrow range. Use the full 0-100 spectrum.
-- Only return case studies that score 30 or above.
+- Always return at least 5 case studies. If fewer than 5 score 30 or above, include the next-highest-scoring ones to reach 5, but note in their reason that they are weak matches.
 
 OUTPUT FORMAT: Return ONLY valid JSON, no markdown fences. Use this exact structure:
 {"scores": [{"id": "case-study-id", "score": 72, "reason": "Issue: 20, Goal: 12, Audience: 10, Timeline: 15, Resources: 5, Stuck: 10. [One sentence summary of why]."}]}
