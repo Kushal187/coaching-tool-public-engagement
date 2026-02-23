@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Filter,
   MapPin,
@@ -8,10 +8,125 @@ import {
   ArrowRight,
   Loader2,
   RefreshCw,
+  Search,
+  X,
 } from 'lucide-react';
 import { Link } from 'react-router';
 import { Badge } from './ui/badge';
 import type { CaseStudy } from '../data/caseStudies';
+
+const TOPIC_CATEGORIES: { label: string; keywords: string[] }[] = [
+  {
+    label: 'Governance & Democracy',
+    keywords: [
+      'governance', 'democracy', 'deliberative', 'participatory governance',
+      'constitutional', 'electoral', 'referendum', 'citizen assembly',
+      'citizens\' assembly', 'legislative', 'parliament', 'voting',
+      'sortition', 'mini-public', 'citizen panel', 'citizens\' jury',
+      'citizen jury', 'open government', 'accountability', 'transparency',
+      'decentralization', 'devolution',
+    ],
+  },
+  {
+    label: 'Budgeting & Public Finance',
+    keywords: [
+      'budget', 'fiscal', 'public finance', 'tax', 'revenue',
+      'financial management', 'resource allocation', 'funding',
+    ],
+  },
+  {
+    label: 'Urban Planning & Housing',
+    keywords: [
+      'urban planning', 'urban development', 'housing', 'urban regeneration',
+      'land use', 'zoning', 'placemaking', 'urban renewal', 'urban design',
+      'urban redevelopment', 'smart city', 'smart cities', 'urban infrastructure',
+      'neighborhood', 'neighbourhood', 'informal settlement', 'slum',
+    ],
+  },
+  {
+    label: 'Climate & Environment',
+    keywords: [
+      'climate', 'environment', 'sustainability', 'biodiversity', 'conservation',
+      'energy', 'renewable', 'carbon', 'pollution', 'waste', 'water',
+      'ecological', 'green', 'air quality', 'deforestation', 'ecosystem',
+      'circular economy', 'net zero', 'decarbonization',
+    ],
+  },
+  {
+    label: 'Health & Public Health',
+    keywords: [
+      'health', 'covid', 'pandemic', 'mental health', 'wellbeing', 'well-being',
+      'healthcare', 'medical', 'disease', 'patient', 'hospital', 'vaccine',
+      'sanitation', 'hygiene', 'nutrition', 'hiv', 'aids', 'drug policy',
+      'opioid', 'substance',
+    ],
+  },
+  {
+    label: 'Education',
+    keywords: [
+      'education', 'school', 'curriculum', 'higher education', 'civic education',
+      'learning', 'university', 'student', 'teacher', 'literacy',
+    ],
+  },
+  {
+    label: 'Youth Engagement',
+    keywords: [
+      'youth', 'child', 'young people', 'intergenerational', 'adolescent',
+      'juvenile', 'early childhood',
+    ],
+  },
+  {
+    label: 'Technology & Digital',
+    keywords: [
+      'digital', 'technology', 'online', 'e-participation', 'eparticipation',
+      'e-democracy', 'edemocracy', 'civic tech', 'artificial intelligence', 'ai ',
+      'blockchain', 'open data', 'crowdsourcing', 'hackathon', 'data',
+      'internet', 'mobile', 'platform', 'ict', 'cyber',
+    ],
+  },
+  {
+    label: 'Social Justice & Equity',
+    keywords: [
+      'justice', 'equity', 'gender', 'indigenous', 'human rights', 'racial',
+      'lgbtq', 'disability', 'inclusion', 'diversity', 'feminism', 'feminist',
+      'women', 'minority', 'discrimination', 'civil rights', 'immigrant',
+      'refugee', 'migration', 'decolonization',
+    ],
+  },
+  {
+    label: 'Infrastructure & Transportation',
+    keywords: [
+      'transport', 'infrastructure', 'mobility', 'road', 'transit', 'cycling',
+      'pedestrian', 'traffic', 'railway', 'airport', 'port', 'highway',
+      'bicycle', 'public transit',
+    ],
+  },
+  {
+    label: 'Community Development',
+    keywords: [
+      'community development', 'rural development', 'economic development',
+      'capacity building', 'microfinance', 'cooperative', 'community empowerment',
+      'community organizing', 'community mobilization', 'local development',
+      'regional development', 'poverty', 'livelihood', 'economic empowerment',
+    ],
+  },
+  {
+    label: 'Peace & Reconciliation',
+    keywords: [
+      'peace', 'conflict', 'reconciliation', 'truth commission',
+      'post-conflict', 'restorative justice', 'violence prevention',
+      'transitional justice', 'peacebuilding', 'mediation', 'ceasefire',
+      'war', 'crisis response', 'disaster', 'emergency',
+    ],
+  },
+];
+
+function matchesCategory(tags: string[], keywords: string[]): boolean {
+  return tags.some((tag) => {
+    const lower = tag.toLowerCase();
+    return keywords.some((kw) => lower.includes(kw));
+  });
+}
 
 export function CaseStudies() {
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
@@ -20,6 +135,13 @@ export function CaseStudies() {
   const [selectedSize, setSelectedSize] = useState<string>('all');
   const [selectedTag, setSelectedTag] = useState<string>('all');
 
+  const [searchInput, setSearchInput] = useState('');
+  const [activeQuery, setActiveQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+
+  const allStudiesRef = useRef<CaseStudy[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
+
   const fetchCaseStudies = async () => {
     setLoading(true);
     setError(null);
@@ -27,6 +149,7 @@ export function CaseStudies() {
       const res = await fetch('/api/case-studies');
       if (!res.ok) throw new Error(`Failed to load case studies (${res.status})`);
       const data: CaseStudy[] = await res.json();
+      allStudiesRef.current = data;
       setCaseStudies(data);
     } catch (err) {
       console.error('Failed to fetch case studies:', err);
@@ -42,9 +165,56 @@ export function CaseStudies() {
     fetchCaseStudies();
   }, []);
 
-  const allTags = Array.from(
-    new Set(caseStudies.flatMap((cs) => cs.tags)),
-  ).sort();
+  const executeSearch = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setSearching(true);
+    setActiveQuery(query.trim());
+
+    try {
+      const res = await fetch(
+        `/api/case-studies?q=${encodeURIComponent(query.trim())}`,
+        { signal: controller.signal },
+      );
+      if (!res.ok) throw new Error(`Search failed (${res.status})`);
+      const data: CaseStudy[] = await res.json();
+      console.log(`[search] q="${query}" → ${data.length} results, top 3:`, data.slice(0, 3).map(d => d.title));
+      if (!controller.signal.aborted) {
+        setCaseStudies(data);
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      console.error('Search failed:', err);
+      if (!controller.signal.aborted) {
+        setError(err instanceof Error ? err.message : 'Search failed.');
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setSearching(false);
+      }
+    }
+  }, []);
+
+  const handleClear = useCallback(() => {
+    abortRef.current?.abort();
+    setSearchInput('');
+    setActiveQuery('');
+    setSearching(false);
+    setCaseStudies(allStudiesRef.current);
+  }, []);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        executeSearch(searchInput);
+      }
+    },
+    [executeSearch, searchInput],
+  );
 
   const sizes = ['all', 'small', 'medium', 'large'];
 
@@ -52,7 +222,11 @@ export function CaseStudies() {
     const sizeMatch =
       selectedSize === 'all' || study.scale === selectedSize;
     const tagMatch =
-      selectedTag === 'all' || study.tags.includes(selectedTag);
+      selectedTag === 'all' ||
+      matchesCategory(
+        study.tags,
+        TOPIC_CATEGORIES.find((c) => c.label === selectedTag)?.keywords ?? [],
+      );
     return sizeMatch && tagMatch;
   });
 
@@ -71,6 +245,44 @@ export function CaseStudies() {
           on any case study.
         </p>
       </div>
+
+      {!loading && !error && (
+        <div className="mb-6 flex gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Search case studies by keyword or topic…"
+              className="w-full pl-10 pr-9 py-2.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent bg-white text-sm"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={handleClear}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => executeSearch(searchInput)}
+            disabled={searching || !searchInput.trim()}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#124D8F] text-white text-sm font-medium rounded-md hover:bg-[#0e3d72] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {searching ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Search className="w-4 h-4" />
+            )}
+            Search
+          </button>
+        </div>
+      )}
 
       {loading && (
         <div className="flex flex-col items-center justify-center py-24 space-y-4">
@@ -131,9 +343,9 @@ export function CaseStudies() {
                   className="w-full px-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent bg-white cursor-pointer"
                 >
                   <option value="all">All Topics</option>
-                  {allTags.map((tag) => (
-                    <option key={tag} value={tag}>
-                      {tag}
+                  {TOPIC_CATEGORIES.map((cat) => (
+                    <option key={cat.label} value={cat.label}>
+                      {cat.label}
                     </option>
                   ))}
                 </select>
@@ -252,7 +464,15 @@ export function CaseStudies() {
             ))}
           </div>
 
-          {filteredCaseStudies.length === 0 && caseStudies.length > 0 && (
+          {filteredCaseStudies.length === 0 && activeQuery && (
+            <div className="text-center py-12">
+              <p className="text-gray-500">
+                No case studies found for '{activeQuery}'. Try a different search term.
+              </p>
+            </div>
+          )}
+
+          {filteredCaseStudies.length === 0 && !activeQuery && caseStudies.length > 0 && (
             <div className="text-center py-12">
               <p className="text-gray-500">
                 No case studies match your selected filters. Try adjusting your
@@ -261,7 +481,7 @@ export function CaseStudies() {
             </div>
           )}
 
-          {caseStudies.length === 0 && (
+          {caseStudies.length === 0 && !activeQuery && (
             <div className="text-center py-12">
               <p className="text-gray-500">
                 No case studies are available yet. Run the ingestion pipeline to

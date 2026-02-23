@@ -736,6 +736,7 @@ function mapCaseStudy(hit, includeFull) {
 }
 
 app.get('/api/case-studies', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   try {
     if (req.query.id) {
       const result = await weaviateClient.graphql
@@ -757,16 +758,59 @@ app.get('/api/case-studies', async (req, res) => {
       return res.json(mapCaseStudy(hits[0], true));
     }
 
-    const result = await weaviateClient.graphql
-      .get()
-      .withClassName(CS_COLLECTION)
-      .withFields(CS_SUMMARY_FIELDS)
-      .withLimit(200)
-      .do();
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    let hits;
 
-    let items = (result?.data?.Get?.[CS_COLLECTION] ?? []).map((h) =>
-      mapCaseStudy(h, false),
-    );
+    if (q) {
+      console.log(`[case-studies] search q="${q}"`);
+      try {
+        const searchResult = await weaviateClient.graphql
+          .get()
+          .withClassName(CS_COLLECTION)
+          .withFields(CS_SUMMARY_FIELDS)
+          .withNearText({ concepts: [q] })
+          .withLimit(50)
+          .do();
+        hits = searchResult?.data?.Get?.[CS_COLLECTION] ?? [];
+        console.log(`[case-studies] nearText search → ${hits.length} hit(s)`);
+        hits.slice(0, 5).forEach((h, i) =>
+          console.log(`  ${i + 1}. ${h.title}`),
+        );
+      } catch (searchErr) {
+        console.error('[case-studies] nearText search failed, falling back to hybrid:', searchErr.message);
+        try {
+          const fallback = await weaviateClient.graphql
+            .get()
+            .withClassName(CS_COLLECTION)
+            .withFields(CS_SUMMARY_FIELDS)
+            .withHybrid({ query: q, alpha: 0.75 })
+            .withLimit(50)
+            .do();
+          hits = fallback?.data?.Get?.[CS_COLLECTION] ?? [];
+          console.log(`[case-studies] hybrid fallback → ${hits.length} hit(s)`);
+        } catch (hybridErr) {
+          console.error('[case-studies] hybrid fallback also failed:', hybridErr.message);
+          hits = [];
+        }
+      }
+    } else {
+      const result = await weaviateClient.graphql
+        .get()
+        .withClassName(CS_COLLECTION)
+        .withFields(CS_SUMMARY_FIELDS)
+        .withLimit(200)
+        .do();
+      hits = result?.data?.Get?.[CS_COLLECTION] ?? [];
+    }
+
+    const seen = new Set();
+    let items = hits
+      .map((h) => mapCaseStudy(h, false))
+      .filter((cs) => {
+        if (seen.has(cs.id)) return false;
+        seen.add(cs.id);
+        return true;
+      });
 
     if (req.query.scale) {
       const scale = req.query.scale.toLowerCase();
