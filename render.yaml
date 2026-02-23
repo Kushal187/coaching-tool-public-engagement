@@ -2,7 +2,7 @@ services:
   - type: web
     name: coaching-tool-public-engagement
     env: node
-    plan: starter
+    plan: free
     autoDeploy: true
     healthCheckPath: /
     buildCommand: npm ci && npm run build
