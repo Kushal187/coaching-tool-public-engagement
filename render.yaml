@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: coaching-tool-public-engagement
+    env: node
+    plan: starter
+    autoDeploy: true
+    healthCheckPath: /
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.12.2
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: WEAVIATE_HOST
+        sync: false
+      - key: WEAVIATE_SCHEME
+        value: https
+      - key: WEAVIATE_API_KEY
+        sync: false
+      - key: CHATBOT_MODEL
+        value: gpt-4.1
+      - key: CHATBOT_MAX_RESULTS
+        value: 5
