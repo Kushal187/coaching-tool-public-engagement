@@ -485,6 +485,266 @@ app.post('/api/generate-questions', async (req, res) => {
   }
 });
 
+// ── POST /api/evaluate-assessment ───────────────────────────
+
+const NESTA_QUESTIONS = [
+  { id: 1, question: "Have you articulated the project's goals?" },
+  { id: 2, question: 'Have you identified the right participants?' },
+  { id: 3, question: 'Can you reach the participants you identified?' },
+  { id: 4, question: 'Who is the right owner?' },
+  { id: 5, question: 'Have you included incentives for participation?' },
+  { id: 6, question: 'Have you defined the tasks?' },
+  { id: 7, question: 'Have you established the workflow?' },
+  { id: 8, question: 'How will you evaluate inputs?' },
+  { id: 9, question: 'How will you use what the group creates?' },
+];
+
+const EVALUATE_ASSESSMENT_PROMPT = `You are an expert public engagement evaluator using the Nesta framework for participatory projects.
+
+You have access to a knowledge base of public engagement guides, case studies, and best practices. Use your search tools to find relevant evidence for evaluating the user's responses.
+
+PROCESS:
+1. Read each of the 9 Nesta framework responses carefully.
+2. Search the knowledge base at least 3 times to find relevant best practices, standards, and examples for evaluating these responses.
+3. For each question, assess whether the user's response adequately addresses the question based on best practices.
+
+EVALUATION CRITERIA:
+For each of the 9 questions, assign one of three statuses:
+- "addressed": The response demonstrates clear, specific, and actionable thinking. The user has a solid plan or approach.
+- "partial": The response shows some awareness but lacks specificity, completeness, or actionable detail. Key elements are missing.
+- "not-addressed": The response is vague, off-topic, missing critical elements, or shows the user hasn't thought through this aspect.
+
+For each question, also provide:
+- "gap": A concise description of what's missing or could be improved (empty string if fully addressed).
+- "coachingContext": An opening message for a coaching conversation that acknowledges what the user said and guides them toward filling the gap. Be warm, specific, and reference their actual response. For addressed items, provide an affirming message.
+
+RULES:
+- Be fair but rigorous. Don't mark something as "addressed" if it's vague or generic.
+- Reference specific parts of the user's response in your evaluation.
+- Ground your evaluation criteria in evidence from the knowledge base where possible.
+- The coaching context should feel like a conversation opener, not a lecture.
+
+You MUST respond with valid JSON in exactly this format (no markdown, no code fences):
+{
+  "evaluations": [
+    {
+      "questionId": 1,
+      "question": "Have you articulated the project's goals?",
+      "status": "addressed",
+      "gap": "",
+      "coachingContext": "Your goals are clearly defined..."
+    }
+  ]
+}
+
+Return exactly 9 evaluations, one for each question, in order.`;
+
+app.post('/api/evaluate-assessment', async (req, res) => {
+  const { responses } = req.body;
+
+  if (!responses || typeof responses !== 'object') {
+    return res.status(400).json({ error: 'Missing required field: responses.' });
+  }
+
+  try {
+    const lines = [
+      'Evaluate the following responses to the 9 Nesta framework questions for public engagement:',
+      '',
+    ];
+
+    for (const q of NESTA_QUESTIONS) {
+      const answer = responses[q.id] || '(No response provided)';
+      lines.push(`## Question ${q.id}: ${q.question}`);
+      lines.push(`**Response:** ${answer}`);
+      lines.push('');
+    }
+
+    lines.push('Please evaluate each response and return structured JSON with your assessment.');
+
+    const userMessage = lines.join('\n');
+
+    const result = await runAgentLoop({
+      systemPrompt: EVALUATE_ASSESSMENT_PROMPT,
+      userMessage,
+      tools: agentToolDefinitions,
+      toolImpls: agentToolImplementations,
+      model: MODEL,
+      maxIterations: MAX_ITERATIONS,
+    });
+
+    let parsed;
+    try {
+      const cleaned = result.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      parsed = JSON.parse(cleaned);
+    } catch {
+      console.error('Failed to parse evaluation response as JSON:', result);
+      return res.status(500).json({ error: 'Failed to parse evaluation.' });
+    }
+
+    if (!parsed.evaluations || !Array.isArray(parsed.evaluations)) {
+      return res.status(500).json({ error: 'Invalid evaluation format.' });
+    }
+
+    res.json(parsed);
+  } catch (error) {
+    console.error('Error evaluating assessment:', error);
+    res.status(500).json({ error: 'Failed to evaluate assessment.' });
+  }
+});
+
+// ── POST /api/generate-reflection ───────────────────────────
+
+const GENERATE_REFLECTION_PROMPT = `You are an expert public engagement coach producing a final reflection for a practitioner who has completed the Nesta framework self-assessment and coaching process.
+
+You have access to a knowledge base of public engagement guides, case studies, and best practices. Use your search tools to ground your reflection in evidence.
+
+PROCESS:
+1. Review the user's original responses to all 9 Nesta questions and the AI evaluation of each.
+2. Carefully review the COACHING CONVERSATIONS provided for each question. These conversations show what happened AFTER the initial assessment — the user may have explored ideas, proposed solutions, refined their thinking, or skipped coaching entirely.
+3. Search the knowledge base at least 3 times for relevant best practices, frameworks, and examples.
+4. Produce a structured, in-depth reflection that accounts for the FULL journey — original answers AND coaching conversations.
+
+COACHING CONVERSATION CONTEXT:
+For each question, you will see one of these scenarios:
+- "PRODUCTIVE CONVERSATION" — The user engaged with the coach, explored ideas, and possibly proposed approaches. Your reflection should acknowledge the GROWTH shown in the conversation, not just the original answer. If the user proposed and refined a solution, reflect on that refined approach.
+- "RESOLVED WITHOUT CONVERSATION" — The user marked this as resolved without engaging in coaching. Flag this: acknowledge the original answer was sufficient OR note that the user skipped deeper exploration despite identified gaps.
+- "UNRESOLVED WITH ACTIVE CONVERSATION" — The user started coaching but hasn't resolved the item. Reflect on what was explored and what remains to be done.
+- "NO COACHING SESSION" — No conversation occurred and the item was not resolved. The reflection should note this needs attention.
+
+OUTPUT RULES:
+- Write in second person ("you"), warm but professional tone.
+- Be specific — reference what the user actually wrote AND what emerged in coaching conversations.
+- For addressed items: if coaching happened, reflect on the user's growth and refined approach. If resolved without coaching, note whether the original answer was strong enough to stand alone.
+- For partial items: acknowledge what they started, what coaching revealed, and give 1-2 concrete next steps.
+- For not-addressed items: explain why this dimension matters (with evidence), reference any coaching conversation that occurred, and give 2-3 actionable steps.
+- Priority actions should be the single most impactful thing to do first, grounded in evidence and informed by coaching conversations.
+
+You MUST respond with valid JSON in exactly this format (no markdown, no code fences):
+{
+  "reflection": {
+    "summary": "A 2-3 paragraph narrative summary of overall engagement readiness, highlighting key strengths, the most critical areas to develop, and how the coaching process shaped their thinking.",
+    "addressed": [
+      {
+        "questionId": 1,
+        "question": "Question text",
+        "analysis": "In-depth analysis incorporating both the original answer and any coaching conversation. Note growth, refined approaches, or if resolved without coaching."
+      }
+    ],
+    "partial": [
+      {
+        "questionId": 2,
+        "question": "Question text",
+        "analysis": "What was started, what coaching revealed, what's still missing.",
+        "nextSteps": ["Concrete step 1", "Concrete step 2"]
+      }
+    ],
+    "notAddressed": [
+      {
+        "questionId": 3,
+        "question": "Question text",
+        "analysis": "Why this dimension matters, what coaching explored (if any), and the risk of leaving it unaddressed.",
+        "nextSteps": ["Concrete step 1", "Concrete step 2", "Concrete step 3"]
+      }
+    ],
+    "priorityActions": [
+      {
+        "action": "Clear, actionable description of what to do",
+        "rationale": "Why this is the highest priority right now",
+        "timeline": "Suggested timeframe (e.g., 'This week', 'Next 2 weeks')"
+      }
+    ]
+  }
+}
+
+Return exactly the items that match each status category. priorityActions should contain exactly 3 items.`;
+
+app.post('/api/generate-reflection', async (req, res) => {
+  const { responses, evaluations, chatHistories } = req.body;
+
+  if (!responses || !evaluations) {
+    return res.status(400).json({ error: 'Missing required fields: responses, evaluations.' });
+  }
+
+  try {
+    const lines = [
+      'Generate an in-depth reflection for the following Nesta framework self-assessment and coaching journey.',
+      '',
+      '## User Responses, Evaluations, and Coaching Conversations',
+      '',
+    ];
+
+    for (const q of NESTA_QUESTIONS) {
+      const answer = responses[q.id] || '(No response provided)';
+      const evaluation = evaluations.find((e) => e.questionId === q.id);
+      lines.push(`### Question ${q.id}: ${q.question}`);
+      lines.push(`**User's Response:** ${answer}`);
+      if (evaluation) {
+        lines.push(`**Current Status:** ${evaluation.status}`);
+        if (evaluation.gap) lines.push(`**Identified Gap:** ${evaluation.gap}`);
+      }
+
+      const chat = chatHistories?.[q.id];
+      const userMessages = chat?.filter((m) => m.role === 'user') || [];
+      const assistantMessages = chat?.filter((m) => m.role === 'assistant') || [];
+      const isResolved = evaluation?.status === 'addressed';
+
+      if (chat && chat.length > 1 && userMessages.length > 0) {
+        if (isResolved) {
+          lines.push('**Coaching:** PRODUCTIVE CONVERSATION — The user engaged with the coach and resolved this item.');
+        } else {
+          lines.push('**Coaching:** UNRESOLVED WITH ACTIVE CONVERSATION — The user engaged with the coach but has not yet resolved this item.');
+        }
+        lines.push('**Conversation Summary:**');
+        for (const msg of chat) {
+          if (msg.role === 'user') {
+            lines.push(`  User: ${msg.content}`);
+          } else if (msg.role === 'assistant') {
+            const preview = msg.content.length > 500 ? msg.content.slice(0, 500) + '...' : msg.content;
+            lines.push(`  Coach: ${preview}`);
+          }
+        }
+      } else if (isResolved) {
+        lines.push('**Coaching:** RESOLVED WITHOUT CONVERSATION — The user marked this as resolved without engaging in a coaching conversation.');
+      } else {
+        lines.push('**Coaching:** NO COACHING SESSION — No conversation occurred and this item remains unresolved.');
+      }
+
+      lines.push('');
+    }
+
+    lines.push('Please produce a comprehensive, evidence-grounded reflection in the required JSON format. Factor in the coaching conversations — acknowledge growth, flag skipped coaching, and note unresolved items.');
+
+    const userMessage = lines.join('\n');
+
+    const result = await runAgentLoop({
+      systemPrompt: GENERATE_REFLECTION_PROMPT,
+      userMessage,
+      tools: agentToolDefinitions,
+      toolImpls: agentToolImplementations,
+      model: MODEL,
+      maxIterations: MAX_ITERATIONS,
+    });
+
+    let parsed;
+    try {
+      const cleaned = result.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      parsed = JSON.parse(cleaned);
+    } catch {
+      console.error('Failed to parse reflection response as JSON:', result);
+      return res.status(500).json({ error: 'Failed to parse reflection.' });
+    }
+
+    if (!parsed.reflection) {
+      return res.status(500).json({ error: 'Invalid reflection format.' });
+    }
+
+    res.json(parsed);
+  } catch (error) {
+    console.error('Error generating reflection:', error);
+    res.status(500).json({ error: 'Failed to generate reflection.' });
+  }
+});
+
 // ── POST /api/adapt-case-study ──────────────────────────────
 
 function formatAdaptRequest(caseStudy, context, constraints) {
