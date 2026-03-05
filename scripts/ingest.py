@@ -2,7 +2,8 @@
 """
 Ingestion pipeline for the Public Engagement Coaching Tool.
 
-Reads from "Data Tracker.xlsx" and loads chunks into Weaviate.
+Reads from "Data Tracker.xlsx" or from JSON registry files (data/registry/)
+and loads chunks into Weaviate.
   - Participedia Case Studies  → section-based chunking
   - Data for ingestion         → Markdown heading-based when present, else sliding-window
 
@@ -11,7 +12,9 @@ Two collections:
   - CaseStudyLibrary    → unchunked case studies with LLM-generated metadata
 
 Usage:
-  python scripts/ingest.py                            # full pipeline
+  python scripts/ingest.py                            # full pipeline (Excel)
+  python scripts/ingest.py --source registry           # ingest from JSON registry
+  python scripts/ingest.py --registry-file <path>      # ingest a single registry JSON file
   python scripts/ingest.py --skip-case-study-library   # chunked ingestion only (legacy)
   python scripts/ingest.py --only-case-study-library   # case study library only
   python scripts/ingest.py --clear                     # wipe both collections
@@ -647,6 +650,134 @@ def chunk_dane(row, content_type=None):
     ]
 
 
+# ── JSON Registry reader ──────────────────────────────────────
+
+def _walk_registry(registry_dir):
+    """Walk the registry directory and yield (filepath, parsed_dict) for each JSON file."""
+    for root, _dirs, files in os.walk(registry_dir):
+        for fname in sorted(files):
+            if not fname.endswith(".json") or fname == "schema.json":
+                continue
+            fpath = os.path.join(root, fname)
+            try:
+                with open(fpath) as f:
+                    data = json.load(f)
+                yield fpath, data
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"  Warning: skipping {fpath}: {e}")
+
+
+def build_chunks_from_registry(registry_dir, single_file=None):
+    """
+    Read JSON registry files and return (all_chunks, raw_case_studies).
+
+    If single_file is provided, only process that one file.
+    """
+    all_chunks = []
+    raw_case_studies = []
+
+    if single_file:
+        entries = []
+        fpath = single_file if os.path.isabs(single_file) else os.path.join(
+            Path(__file__).resolve().parent.parent, single_file
+        )
+        try:
+            with open(fpath) as f:
+                entries.append((fpath, json.load(f)))
+        except Exception as e:
+            print(f"  Error reading {fpath}: {e}")
+            return all_chunks, raw_case_studies
+    else:
+        entries = list(_walk_registry(registry_dir))
+
+    print(f"\n── Registry Ingestion: {len(entries)} files ──")
+
+    # Classify content types via LLM where not already set
+    classify_tasks = []
+    entry_data = []
+
+    for fpath, data in entries:
+        doc_name = data.get("name", "")
+        source = data.get("source", "")
+        source_url = data.get("source_url", "")
+        content = clean_text(data.get("content", ""))
+        doc_date = data.get("doc_date", "")
+        ct = data.get("content_type")
+        fmt = data.get("format", "markdown")
+
+        if not content or len(content) < 50:
+            if fmt != "pdf":
+                print(f"  Skipping (too short): {doc_name[:60]}")
+                continue
+
+        doc_id = uuid.uuid5(
+            DOCUMENT_ID_NAMESPACE,
+            f"registry|{source}|{doc_name}|{source_url}",
+        ).hex
+
+        entry_data.append({
+            "fpath": fpath,
+            "doc_name": doc_name,
+            "source": source,
+            "source_url": source_url,
+            "doc_date": doc_date,
+            "content": content,
+            "doc_id": doc_id,
+            "content_type": ct,
+        })
+
+        if not ct:
+            classify_tasks.append((source, doc_name, content, doc_id))
+
+    # LLM classification for entries without a content_type
+    if classify_tasks:
+        print(f"   Classifying {len(classify_tasks)} entries via LLM ({LLM_WORKERS} workers) …")
+        classifications = {}
+
+        with ThreadPoolExecutor(max_workers=LLM_WORKERS) as pool:
+            futures = {
+                pool.submit(_llm_classify_content_type, src, name, content, did): did
+                for src, name, content, did in classify_tasks
+            }
+            pbar = tqdm(as_completed(futures), total=len(futures), desc="   Classifying")
+            for fut in pbar:
+                did = futures[fut]
+                classifications[did] = fut.result()
+
+        _flush_caches()
+
+        for ed in entry_data:
+            if ed["content_type"] is None:
+                ed["content_type"] = classifications.get(ed["doc_id"], "other")
+
+    # Chunk each entry
+    print("   Chunking …")
+    for ed in tqdm(entry_data, desc="   Chunking"):
+        row = {
+            "Name": ed["doc_name"],
+            "Content": ed["content"],
+            "Source": ed["source"],
+            "Link": ed["source_url"],
+        }
+        chunks = chunk_dane(row, content_type=ed["content_type"])
+        all_chunks.extend(chunks)
+
+        if ed["content_type"] == "case_study" and chunks:
+            raw_case_studies.append({
+                "document_id": ed["doc_id"],
+                "title": ed["doc_name"],
+                "source_label": ed["source"],
+                "source_url": ed["source_url"],
+                "doc_date": ed["doc_date"],
+                "full_content": ed["content"],
+            })
+
+    print(f"   → {len(all_chunks):,} chunks from {len(entry_data)} entries")
+    print(f"   → {len(raw_case_studies):,} case studies identified")
+
+    return all_chunks, raw_case_studies
+
+
 # ── Pipeline helpers ───────────────────────────────────────────
 
 def build_all_chunks(xl_path):
@@ -940,26 +1071,47 @@ def main():
         "--only-case-study-library", action="store_true",
         help="Only build and ingest the CaseStudyLibrary, skip chunked ingestion",
     )
+    parser.add_argument(
+        "--source", choices=["excel", "registry"], default="excel",
+        help="Data source: 'excel' (Data Tracker.xlsx) or 'registry' (data/registry/)",
+    )
+    parser.add_argument(
+        "--registry-file", type=str, default=None,
+        help="Ingest a single registry JSON file instead of the full source",
+    )
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parent.parent
-    xl_path = root / EXCEL_FILE
+    registry_dir = root / "data" / "registry"
 
-    if not xl_path.exists():
-        print(f"Error: {xl_path} not found.")
-        sys.exit(1)
+    # Auto-detect source based on flags
+    use_registry = args.source == "registry" or args.registry_file is not None
+
+    if use_registry:
+        source_label = args.registry_file or str(registry_dir)
+    else:
+        xl_path = root / EXCEL_FILE
+        if not xl_path.exists():
+            print(f"Error: {xl_path} not found.")
+            sys.exit(1)
+        source_label = EXCEL_FILE
 
     print("=" * 60)
     print("  Public Engagement — Data Ingestion Pipeline")
     print("=" * 60)
-    print(f"  Source : {EXCEL_FILE}")
+    print(f"  Source : {source_label}")
     print(f"  Target : {COLLECTION_NAME}", end="")
     if not args.skip_case_study_library:
         print(f" + {CASE_STUDY_COLLECTION}", end="")
     print()
 
     # ── Chunk everything ───────────────────────────────────────
-    all_chunks, raw_case_studies = build_all_chunks(xl_path)
+    if use_registry:
+        all_chunks, raw_case_studies = build_chunks_from_registry(
+            str(registry_dir), single_file=args.registry_file,
+        )
+    else:
+        all_chunks, raw_case_studies = build_all_chunks(xl_path)
 
     if not args.only_case_study_library:
         print_stats(all_chunks)

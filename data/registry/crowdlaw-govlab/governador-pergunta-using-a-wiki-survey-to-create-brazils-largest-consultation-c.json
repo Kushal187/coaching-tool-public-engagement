@@ -1,0 +1,8 @@
+{
+  "name": "Governador Pergunta: Using a Wiki Survey to Create Brazil's Largest Consultation (Case Study)",
+  "source": "Crowdlaw - GovLab",
+  "source_url": "https://congress.crowd.law/",
+  "doc_date": "",
+  "content": "## Governador Pergunta: Using a Wiki Survey to Create Brazil's Largest Consultation\n\n**Location:** Rio Grande do Sul, Brazil\n**Implementation Level:** State\n\n### Overview\nGovernador Pergunta ('Governor Asks') was a large-scale public consultation in the State of Rio Grande do Sul, Brazil, that used a wiki survey tool (All Our Ideas) to engage citizens in identifying priorities for the state. The consultation became Brazil's largest public consultation effort.\n\n### How It Works\nThe consultation used the pairwise wiki survey format from All Our Ideas, presenting participants with two randomly selected items and asking them to select the one of greater importance. This approach enabled scalable participation without requiring extensive processing of open-ended responses.\n\n### Scale and Participation\nOver 100,000 people participated in the Governador Pergunta consultation, making it the largest public consultation in Brazil's history at the time. The wiki survey format enabled this scale because it automatically processes and ranks citizen inputs.\n\n### Lessons Learned\n- Wiki surveys can scale to hundreds of thousands of participants while still producing actionable, rank-ordered results\n- The pairwise voting format lowers barriers to participation compared to lengthy surveys\n- Open source tools like All Our Ideas can enable government-scale consultation at minimal cost",
+  "format": "markdown"
+}
