@@ -485,6 +485,112 @@ app.post('/api/generate-questions', async (req, res) => {
   }
 });
 
+// ── POST /api/generate-scenario-responses ───────────────────
+
+const GENERATE_SCENARIO_PROMPT = `You are a test-data generator for a public engagement coaching tool built on the Nesta framework. Your job is to produce realistic, plausible practitioner responses to 9 self-assessment questions based on a given SCENARIO.
+
+You have access to a knowledge base of public engagement documents. Use your search tools to ground the generated responses in realistic engagement contexts — search for real engagement methods, challenges, and case studies so the answers feel authentic, not generic.
+
+PROCESS:
+1. Read the scenario description carefully.
+2. Search the knowledge base 2-3 times for relevant engagement contexts, methods, and challenges that fit the scenario.
+3. Generate 9 responses that a practitioner matching the scenario would realistically write.
+
+RULES:
+- Each response should be 2-5 sentences — realistic practitioner length, not essay-length.
+- The responses should be internally consistent (they should feel like they come from the same person/project).
+- For adversarial scenarios, make the weaknesses feel natural and believable, not cartoonishly bad.
+- Do NOT include the question text in the response — just the answer.
+- Ground responses in realistic details (mention plausible organizations, methods, timelines, etc.).
+
+You MUST respond with valid JSON in exactly this format (no markdown, no code fences):
+{
+  "scenario": "Brief label for the scenario",
+  "description": "One-sentence description of the persona/situation",
+  "responses": {
+    "1": "Response to question 1...",
+    "2": "Response to question 2...",
+    "3": "Response to question 3...",
+    "4": "Response to question 4...",
+    "5": "Response to question 5...",
+    "6": "Response to question 6...",
+    "7": "Response to question 7...",
+    "8": "Response to question 8...",
+    "9": "Response to question 9..."
+  }
+}`;
+
+const SCENARIO_DESCRIPTIONS = {
+  'well-prepared': 'A well-prepared practitioner who has thoroughly planned their public engagement project. They have clear goals, identified stakeholders, established workflows, and thought through evaluation. Their responses should be detailed, specific, and actionable.',
+  'vague-minimal': 'A practitioner who gives vague, minimal-effort responses. They use generic language, avoid specifics, and seem to be going through the motions without deep thought. Responses should be 1-2 sentences of non-specific filler.',
+  'contradictory': 'A practitioner whose responses contain internal contradictions. For example, they might claim broad inclusivity in one answer but describe a narrow recruitment strategy in another, or set an ambitious timeline while describing limited resources. The contradictions should be subtle and realistic.',
+  'off-topic': 'A practitioner who frequently misunderstands or goes off-topic. They might confuse public engagement with marketing, conflate consultation with co-design, or answer a different question than what was asked. Their confusion should be realistic.',
+  'over-ambitious': 'A practitioner with wildly over-ambitious plans relative to their resources. They describe wanting to engage thousands of people across multiple demographics with complex deliberative processes, but hint at having minimal budget, a short timeline, and a small team.',
+  'hostile-resistant': 'A practitioner who is skeptical or resistant to the engagement process. They express doubt about whether public engagement is worthwhile, question the methodology, give dismissive responses, or indicate they are being forced to do this by management/regulations.',
+  'custom': null,
+};
+
+app.post('/api/generate-scenario-responses', async (req, res) => {
+  const { scenario, customDescription } = req.body;
+
+  if (!scenario) {
+    return res.status(400).json({ error: 'Missing required field: scenario.' });
+  }
+
+  const description = scenario === 'custom'
+    ? customDescription
+    : SCENARIO_DESCRIPTIONS[scenario];
+
+  if (!description) {
+    return res.status(400).json({ error: 'Invalid scenario or missing custom description.' });
+  }
+
+  try {
+    const questionsContext = NESTA_QUESTIONS
+      .map((q) => `Question ${q.id}: ${q.question}`)
+      .join('\n');
+
+    const userMessage = [
+      `Generate realistic practitioner responses for the following scenario:`,
+      ``,
+      `## Scenario`,
+      description,
+      ``,
+      `## Questions to Answer`,
+      questionsContext,
+      ``,
+      `Search the knowledge base for relevant engagement contexts to make the responses feel authentic, then generate the 9 responses in the required JSON format.`,
+    ].join('\n');
+
+    const result = await runAgentLoop({
+      systemPrompt: GENERATE_SCENARIO_PROMPT,
+      userMessage,
+      tools: agentToolDefinitions,
+      toolImpls: agentToolImplementations,
+      model: MODEL,
+      maxIterations: MAX_ITERATIONS,
+    });
+
+    let parsed;
+    try {
+      const cleaned = result.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      parsed = JSON.parse(cleaned);
+    } catch {
+      console.error('Failed to parse scenario response as JSON:', result);
+      return res.status(500).json({ error: 'Failed to parse generated responses.' });
+    }
+
+    if (!parsed.responses || typeof parsed.responses !== 'object') {
+      return res.status(500).json({ error: 'Invalid response format.' });
+    }
+
+    res.json(parsed);
+  } catch (error) {
+    console.error('Error generating scenario responses:', error);
+    res.status(500).json({ error: 'Failed to generate scenario responses.' });
+  }
+});
+
 // ── POST /api/evaluate-assessment ───────────────────────────
 
 const NESTA_QUESTIONS = [
