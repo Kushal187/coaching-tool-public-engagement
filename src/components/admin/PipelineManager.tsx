@@ -9,6 +9,10 @@ import {
   AlertCircle,
   Play,
   Globe,
+  Eye,
+  ArrowLeft,
+  Sparkles,
+  Send,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 
@@ -200,7 +204,6 @@ function UrlIngestForm() {
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState('');
 
-  // After fetch
   const [name, setName] = useState('');
   const [source, setSource] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
@@ -210,14 +213,38 @@ function UrlIngestForm() {
   const [showEditor, setShowEditor] = useState(false);
   const [detectedFormat, setDetectedFormat] = useState<string>('');
 
+  const [llmClassification, setLlmClassification] = useState<{ content_type: string; summary: string } | null>(null);
+  const [classifying, setClassifying] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<IngestResult | null>(null);
+
+  const classifyContent = async (text: string, docName: string) => {
+    setClassifying(true);
+    try {
+      const res = await fetch('/api/admin/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: docName, source, content: text }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLlmClassification(data);
+        if (!contentType) setContentType(data.content_type);
+      }
+    } catch {
+      // Classification is optional
+    } finally {
+      setClassifying(false);
+    }
+  };
 
   const handleFetch = async () => {
     setFetching(true);
     setFetchError('');
     setResult(null);
     setDetectedFormat('');
+    setLlmClassification(null);
 
     try {
       const res = await fetch('/api/admin/ingest/url', {
@@ -228,11 +255,17 @@ function UrlIngestForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch URL');
 
-      setName(data.suggestedTitle || '');
+      const title = data.suggestedTitle || '';
+      const extractedContent = data.extractedContent || '';
+      setName(title);
       setSourceUrl(url);
-      setContent(data.extractedContent || '');
+      setContent(extractedContent);
       setDetectedFormat(data.format || 'html');
       setShowEditor(true);
+
+      if (extractedContent.length > 30) {
+        classifyContent(extractedContent, title);
+      }
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to fetch URL.');
     } finally {
@@ -266,6 +299,7 @@ function UrlIngestForm() {
         setContentType('');
         setContent('');
         setShowEditor(false);
+        setLlmClassification(null);
       }
     } catch {
       setResult({ success: false, error: 'Network error.' });
@@ -323,6 +357,34 @@ function UrlIngestForm() {
             </p>
           )}
 
+          {/* LLM Classification Card */}
+          <div className="p-4 bg-gradient-to-r from-[#E4EFFC]/60 to-purple-50/40 border border-[#124D8F]/10 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-4 h-4 text-[#124D8F]" />
+              <span className="text-sm font-medium text-[#124D8F]">AI Classification</span>
+            </div>
+            {classifying ? (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Classifying document...
+              </div>
+            ) : llmClassification ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Suggested type:</span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#124D8F]/10 text-[#124D8F]">
+                    {llmClassification.content_type.replace(/_/g, ' ')}
+                  </span>
+                </div>
+                {llmClassification.summary && (
+                  <p className="text-sm text-gray-600">{llmClassification.summary}</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">Classification unavailable.</p>
+            )}
+          </div>
+
           <div className="grid sm:grid-cols-2 gap-4">
             <FormField label="Document Name *" value={name} onChange={setName} placeholder="Document title" />
             <FormField label="Source Label *" value={source} onChange={setSource} placeholder="e.g. Blog, Report" />
@@ -347,18 +409,20 @@ function UrlIngestForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Extracted Content (editable)
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-gray-700">
+                Extracted Content (editable)
+              </label>
+              <span className="text-xs text-gray-400">
+                {content.length.toLocaleString()} characters
+              </span>
+            </div>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={12}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-[#124D8F] font-mono resize-y"
             />
-            <p className="text-xs text-gray-400 mt-1">
-              {content.length.toLocaleString()} characters
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -370,7 +434,7 @@ function UrlIngestForm() {
               {submitting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <CheckCircle2 className="w-4 h-4" />
+                <Send className="w-4 h-4" />
               )}
               Confirm & Ingest
             </button>
@@ -382,22 +446,45 @@ function UrlIngestForm() {
   );
 }
 
-// ── PDF Ingest Form ─────────────────────────────────────────
+// ── PDF Ingest Form (multi-step: upload → preview → confirm) ─
+
+type PdfStep = 'upload' | 'converting' | 'preview' | 'ingesting' | 'done';
+
+interface ConvertResult {
+  content: string;
+  pdfPath: string;
+  charCount: number;
+}
+
+interface ClassifyResult {
+  content_type: string;
+  summary: string;
+}
 
 function PdfIngestForm() {
+  const [step, setStep] = useState<PdfStep>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState('');
+  const [dragActive, setDragActive] = useState(false);
+  const [convertError, setConvertError] = useState('');
+
+  // Preview state
+  const [convertResult, setConvertResult] = useState<ConvertResult | null>(null);
+  const [previewContent, setPreviewContent] = useState('');
   const [source, setSource] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
   const [docDate, setDocDate] = useState('');
   const [contentType, setContentType] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [llmClassification, setLlmClassification] = useState<ClassifyResult | null>(null);
+  const [classifying, setClassifying] = useState(false);
+
+  // Ingest state
   const [result, setResult] = useState<IngestResult | null>(null);
-  const [dragActive, setDragActive] = useState(false);
   const [lastIngestedName, setLastIngestedName] = useState('');
 
   const handleFile = (f: File) => {
     setFile(f);
+    setConvertError('');
     setResult(null);
     setLastIngestedName('');
     if (!name) setName(f.name.replace(/\.pdf$/i, ''));
@@ -410,69 +497,270 @@ function PdfIngestForm() {
     if (f && f.type === 'application/pdf') handleFile(f);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleConvert = async () => {
     if (!file) return;
-
-    setSubmitting(true);
-    setResult(null);
+    setStep('converting');
+    setConvertError('');
 
     try {
       const buffer = await file.arrayBuffer();
-      const res = await fetch('/api/admin/ingest/pdf', {
+      const res = await fetch('/api/admin/ingest/pdf/convert', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/pdf',
           'X-Filename': file.name,
-          'X-Doc-Name': name,
-          'X-Source': source || 'PDF Upload',
-          'X-Source-Url': sourceUrl,
-          'X-Doc-Date': docDate,
-          'X-Content-Type': contentType,
+          'X-Doc-Name': encodeURIComponent(name),
         },
         body: buffer,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Conversion failed.');
+
+      setConvertResult(data);
+      setPreviewContent(data.content);
+      setStep('preview');
+
+      // Kick off LLM classification in background
+      classifyContent(data.content);
+    } catch (err) {
+      setConvertError(err instanceof Error ? err.message : 'Conversion failed.');
+      setStep('upload');
+    }
+  };
+
+  const classifyContent = async (content: string) => {
+    setClassifying(true);
+    try {
+      const res = await fetch('/api/admin/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, source, content }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLlmClassification(data);
+        if (!contentType) setContentType(data.content_type);
+      }
+    } catch {
+      // Classification is optional; don't block the flow
+    } finally {
+      setClassifying(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!convertResult) return;
+    setStep('ingesting');
+    setResult(null);
+
+    try {
+      const res = await fetch('/api/admin/ingest/pdf/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          source: source || 'PDF Upload',
+          source_url: sourceUrl,
+          doc_date: docDate,
+          content_type: contentType || undefined,
+          content: previewContent,
+          pdfPath: convertResult.pdfPath,
+        }),
       });
       const data = await res.json();
       setResult(data);
       if (data.success) {
         setLastIngestedName(name);
-        setFile(null);
-        setName('');
-        setSource('');
-        setSourceUrl('');
-        setDocDate('');
-        setContentType('');
+        setStep('done');
+      } else {
+        setStep('preview');
       }
     } catch {
-      setResult({ success: false, error: 'Upload failed.' });
-    } finally {
-      setSubmitting(false);
+      setResult({ success: false, error: 'Ingestion failed.' });
+      setStep('preview');
     }
   };
 
+  const handleReset = () => {
+    setStep('upload');
+    setFile(null);
+    setName('');
+    setSource('');
+    setSourceUrl('');
+    setDocDate('');
+    setContentType('');
+    setConvertResult(null);
+    setPreviewContent('');
+    setLlmClassification(null);
+    setConvertError('');
+  };
+
+  // ── Step: Done ──
+  if (step === 'done') {
+    return (
+      <div className="space-y-4 mt-4">
+        <div className="flex items-start gap-3 px-5 py-4 bg-green-50 border border-green-200 rounded-lg">
+          <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+          <div className="space-y-1">
+            <p className="font-medium text-green-800">
+              "{lastIngestedName}" ingested successfully
+            </p>
+            <p className="text-sm text-green-700">
+              PDF converted via Docling, classified as <span className="font-medium">{contentType || 'auto'}</span>, and added to the knowledge base.
+            </p>
+            {result?.registryPath && (
+              <p className="text-xs text-green-600 font-mono">
+                Registry: {result.registryPath}
+              </p>
+            )}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleReset}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+        >
+          <Upload className="w-4 h-4" />
+          Upload another PDF
+        </button>
+      </div>
+    );
+  }
+
+  // ── Step: Preview ──
+  if (step === 'preview' || step === 'ingesting') {
+    return (
+      <div className="space-y-5 mt-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={step === 'ingesting'}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Eye className="w-4 h-4" />
+            Preview &amp; Review
+          </div>
+        </div>
+
+        {/* LLM Classification Card */}
+        <div className="p-4 bg-gradient-to-r from-[#E4EFFC]/60 to-purple-50/40 border border-[#124D8F]/10 rounded-lg">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-4 h-4 text-[#124D8F]" />
+            <span className="text-sm font-medium text-[#124D8F]">AI Classification</span>
+          </div>
+          {classifying ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Classifying document...
+            </div>
+          ) : llmClassification ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Suggested type:</span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#124D8F]/10 text-[#124D8F]">
+                  {llmClassification.content_type.replace(/_/g, ' ')}
+                </span>
+              </div>
+              {llmClassification.summary && (
+                <p className="text-sm text-gray-600">{llmClassification.summary}</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">Classification unavailable.</p>
+          )}
+        </div>
+
+        {/* Metadata */}
+        <div className="grid sm:grid-cols-2 gap-4">
+          <FormField label="Document Name *" value={name} onChange={setName} placeholder="Document title" />
+          <FormField label="Source Label" value={source} onChange={setSource} placeholder="e.g. Academic Paper" />
+          <FormField label="Source URL" value={sourceUrl} onChange={setSourceUrl} placeholder="https://..." />
+          <FormField label="Date" value={docDate} onChange={setDocDate} placeholder="YYYY-MM-DD" />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Content Type
+          </label>
+          <select
+            value={contentType}
+            onChange={(e) => setContentType(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#124D8F]"
+          >
+            <option value="">Auto-detect (LLM classification)</option>
+            {CONTENT_TYPES.map((t) => (
+              <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Content preview */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-sm font-medium text-gray-700">
+              Converted Content (editable)
+            </label>
+            <span className="text-xs text-gray-400">
+              {previewContent.length.toLocaleString()} characters
+            </span>
+          </div>
+          <textarea
+            value={previewContent}
+            onChange={(e) => setPreviewContent(e.target.value)}
+            rows={14}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-[#124D8F] font-mono resize-y"
+          />
+        </div>
+
+        {/* Error */}
+        {result && !result.success && (
+          <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <p>{result.error || 'Ingestion failed.'}</p>
+          </div>
+        )}
+
+        {/* Confirm button */}
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={step === 'ingesting' || !name || !previewContent}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#124D8F] text-white text-sm font-medium rounded-md hover:bg-[#0e3d72] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {step === 'ingesting' ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+            {step === 'ingesting' ? 'Ingesting...' : 'Confirm & Ingest'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step: Upload ──
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-      {/* Success banner (persists after form reset) */}
-      {result?.success && !file && (
+    <div className="space-y-4 mt-4">
+      {/* Success banner from previous upload */}
+      {lastIngestedName && result?.success && (
         <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
           <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-          <div>
-            <p className="font-medium">
-              "{lastIngestedName}" uploaded and ingested successfully.
-            </p>
-            <p className="text-green-600 text-xs mt-0.5">
-              PDF saved, converted via Docling, and pipeline triggered.
-              {result.registryPath ? ` Registry: ${result.registryPath}` : ''}
-            </p>
-          </div>
+          <p className="font-medium">"{lastIngestedName}" was ingested successfully.</p>
         </div>
       )}
 
-      {/* Error banner (persists after form reset) */}
-      {result && !result.success && !file && (
+      {convertError && (
         <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <p>{result.error || 'Upload failed.'}</p>
+          <p>{convertError}</p>
         </div>
       )}
 
@@ -526,47 +814,29 @@ function PdfIngestForm() {
 
       {file && (
         <>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <FormField label="Document Name *" value={name} onChange={setName} placeholder="Document title" />
-            <FormField label="Source Label" value={source} onChange={setSource} placeholder="e.g. Academic Paper" />
-            <FormField label="Source URL (if applicable)" value={sourceUrl} onChange={setSourceUrl} placeholder="https://original-source.com/..." />
-            <FormField label="Date" value={docDate} onChange={setDocDate} placeholder="YYYY-MM-DD" />
-          </div>
+          <FormField label="Document Name *" value={name} onChange={setName} placeholder="Document title" />
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Content Type
-            </label>
-            <select
-              value={contentType}
-              onChange={(e) => setContentType(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#124D8F]"
-            >
-              <option value="">Auto-detect (LLM classification)</option>
-              {CONTENT_TYPES.map((t) => (
-                <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={submitting || !name}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#124D8F] text-white text-sm font-medium rounded-md hover:bg-[#0e3d72] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              {submitting ? (
+          <button
+            type="button"
+            onClick={handleConvert}
+            disabled={step === 'converting' || !name}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#124D8F] text-white text-sm font-medium rounded-md hover:bg-[#0e3d72] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {step === 'converting' ? (
+              <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Upload className="w-4 h-4" />
-              )}
-              Upload & Ingest
-            </button>
-            <ResultBadge result={result} />
-          </div>
+                Converting PDF...
+              </>
+            ) : (
+              <>
+                <Eye className="w-4 h-4" />
+                Convert & Preview
+              </>
+            )}
+          </button>
         </>
       )}
-    </form>
+    </div>
   );
 }
 
