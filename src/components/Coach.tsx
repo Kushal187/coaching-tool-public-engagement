@@ -1,7 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from './ui/dialog';
+import { Badge } from './ui/badge';
 
 const NESTA_QUESTIONS = [
   {
@@ -80,6 +89,56 @@ const NESTA_QUESTIONS = [
 
 export type NestaResponses = Record<number, string>;
 
+const SCENARIOS = [
+  {
+    id: 'well-prepared',
+    label: 'Well-Prepared Practitioner',
+    description: 'Thorough, detailed, and actionable responses',
+    color: 'bg-green-100 text-green-800 border-green-200',
+  },
+  {
+    id: 'vague-minimal',
+    label: 'Vague / Minimal Effort',
+    description: 'Generic, non-specific filler responses',
+    color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    adversarial: true,
+  },
+  {
+    id: 'contradictory',
+    label: 'Contradictory Responses',
+    description: 'Internally inconsistent answers across questions',
+    color: 'bg-orange-100 text-orange-800 border-orange-200',
+    adversarial: true,
+  },
+  {
+    id: 'off-topic',
+    label: 'Off-Topic / Confused',
+    description: 'Misunderstands questions or conflates concepts',
+    color: 'bg-red-100 text-red-800 border-red-200',
+    adversarial: true,
+  },
+  {
+    id: 'over-ambitious',
+    label: 'Over-Ambitious',
+    description: 'Grand plans with unrealistic scope and resources',
+    color: 'bg-purple-100 text-purple-800 border-purple-200',
+    adversarial: true,
+  },
+  {
+    id: 'hostile-resistant',
+    label: 'Hostile / Resistant',
+    description: 'Skeptical, dismissive, or forced participation',
+    color: 'bg-red-100 text-red-800 border-red-200',
+    adversarial: true,
+  },
+  {
+    id: 'custom',
+    label: 'Custom Scenario',
+    description: 'Describe your own scenario for the AI to generate',
+    color: 'bg-blue-100 text-blue-800 border-blue-200',
+  },
+] as const;
+
 export function Coach() {
   const navigate = useNavigate();
   const [responses, setResponses] = useState<NestaResponses>(() => {
@@ -90,6 +149,51 @@ export function Coach() {
     return {};
   });
   const [submitting, setSubmitting] = useState(false);
+  const [scenarioDialogOpen, setScenarioDialogOpen] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
+  const [customDescription, setCustomDescription] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  const handleGenerateScenario = async () => {
+    if (!selectedScenario) return;
+    if (selectedScenario === 'custom' && !customDescription.trim()) return;
+
+    setGenerating(true);
+    setGenerationError(null);
+
+    try {
+      const res = await fetch('/api/generate-scenario-responses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario: selectedScenario,
+          customDescription: selectedScenario === 'custom' ? customDescription : undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error(err.error || 'Failed to generate responses');
+      }
+
+      const data = await res.json();
+
+      const newResponses: NestaResponses = {};
+      for (const [key, value] of Object.entries(data.responses)) {
+        newResponses[Number(key)] = value as string;
+      }
+      setResponses(newResponses);
+      sessionStorage.setItem('nestaResponses', JSON.stringify(newResponses));
+      setScenarioDialogOpen(false);
+      setSelectedScenario(null);
+      setCustomDescription('');
+    } catch (err) {
+      setGenerationError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const handleChange = (id: number, value: string) => {
     setResponses((prev) => ({ ...prev, [id]: value }));
@@ -140,7 +244,115 @@ export function Coach() {
           thinking. Your responses will be analyzed to identify strengths and
           areas for improvement.
         </p>
+
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setScenarioDialogOpen(true)}
+            className="gap-2 border-[#124D8F]/30 text-[#124D8F] hover:bg-[#124D8F]/5"
+          >
+            <Sparkles className="w-4 h-4" />
+            Generate Scenario Responses
+          </Button>
+        </div>
       </div>
+
+      <Dialog open={scenarioDialogOpen} onOpenChange={setScenarioDialogOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#124D8F]" style={{ fontFamily: "'DM Serif Display', serif" }}>
+              Generate Scenario Responses
+            </DialogTitle>
+            <DialogDescription>
+              Select a scenario to auto-fill all 9 questions with AI-generated
+              responses. Use this to test how the coaching tool handles different
+              practitioner profiles.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-2 py-2 max-h-[400px] overflow-y-auto">
+            {SCENARIOS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  setSelectedScenario(s.id);
+                  setGenerationError(null);
+                }}
+                className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                  selectedScenario === s.id
+                    ? 'border-[#124D8F] bg-[#E4EFFC]/50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-medium text-sm text-gray-900">{s.label}</span>
+                  {'adversarial' in s && s.adversarial && (
+                    <Badge variant="outline" className="text-[10px] py-0 border-orange-300 text-orange-600">
+                      <AlertTriangle className="w-3 h-3" />
+                      Adversarial
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">{s.description}</p>
+              </button>
+            ))}
+          </div>
+
+          {selectedScenario === 'custom' && (
+            <textarea
+              value={customDescription}
+              onChange={(e) => setCustomDescription(e.target.value)}
+              placeholder="Describe the practitioner persona and their situation (e.g., 'A first-time facilitator running a rushed community consultation with no budget')..."
+              className="w-full min-h-[80px] px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent resize-y"
+            />
+          )}
+
+          {generationError && (
+            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md">
+              {generationError}
+            </p>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setScenarioDialogOpen(false);
+                setSelectedScenario(null);
+                setGenerationError(null);
+              }}
+              disabled={generating}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleGenerateScenario}
+              disabled={
+                !selectedScenario ||
+                generating ||
+                (selectedScenario === 'custom' && !customDescription.trim())
+              }
+              className="gap-2"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Generate
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="mb-6 flex items-center gap-3">
         <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
