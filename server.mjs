@@ -273,7 +273,10 @@ async function resolveAndStream(res, messages) {
     messages,
   });
 
+  let fullContent = '';
+
   if (earlyContent) {
+    fullContent = earlyContent;
     res.write(formatSSEChunk(earlyContent));
   } else {
     const stream = await openaiClient.chat.completions.create({
@@ -283,7 +286,10 @@ async function resolveAndStream(res, messages) {
     });
     for await (const chunk of stream) {
       const content = chunk.choices?.[0]?.delta?.content || '';
-      if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      if (content) {
+        fullContent += content;
+        res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      }
     }
   }
 
@@ -291,8 +297,129 @@ async function resolveAndStream(res, messages) {
   if (allSources.length > 0) {
     res.write(formatSSESources(buildSourceDocuments(allSources)));
   }
+
+  res._lastStreamedContent = fullContent;
+
   res.write(formatSSEDone());
   res.end();
+
+  return fullContent;
+}
+
+// ── Background coaching evaluation ──────────────────────────
+// Runs after the coach response is sent to the user. Logs results
+// to the server console without affecting the user experience.
+
+const EVALUATE_COACHING_PROMPT = `You are an expert evaluator assessing the quality of an AI coaching conversation about public engagement.
+
+The coach being evaluated uses the Nesta framework to help practitioners improve their public engagement plans through Socratic dialogue.
+
+EVALUATION DIMENSIONS (score each 1-10):
+1. Socratic Approach: Does the coach ask probing questions to guide thinking, rather than lecturing? Does it encourage self-discovery?
+2. Specificity: Does the coach reference the practitioner's actual words and situation, or give generic advice?
+3. Evidence Use: Does the coach cite sources or ground recommendations in evidence? Or give unsupported opinions?
+4. Warmth & Tone: Is the coach warm, collaborative, and encouraging? Or cold, condescending, or robotic?
+5. Gap Targeting: Does the coach effectively guide the practitioner toward addressing the identified gap?
+6. Progression: Does the conversation move forward meaningfully? Does the coach build on previous exchanges?
+
+SCORING GUIDE:
+- 9-10: Exceptional coaching
+- 7-8: Good coaching with minor areas for improvement
+- 5-6: Adequate but lacks depth or nuance
+- 3-4: Below average with significant issues
+- 1-2: Poor — fails to provide meaningful coaching
+
+You MUST respond with valid JSON in exactly this format (no markdown, no code fences):
+{
+  "dimensions": {
+    "socratic_approach": { "score": 7, "rationale": "Brief explanation" },
+    "specificity": { "score": 8, "rationale": "Brief explanation" },
+    "evidence_use": { "score": 6, "rationale": "Brief explanation" },
+    "warmth_and_tone": { "score": 9, "rationale": "Brief explanation" },
+    "gap_targeting": { "score": 7, "rationale": "Brief explanation" },
+    "progression": { "score": 8, "rationale": "Brief explanation" }
+  },
+  "overall_score": 75,
+  "strengths": ["Strength 1", "Strength 2"],
+  "weaknesses": ["Weakness 1", "Weakness 2"],
+  "recommendations": ["Improvement suggestion 1", "Improvement suggestion 2"],
+  "summary": "2-3 sentence overall assessment of coaching quality."
+}
+
+The overall_score should be the average of all dimension scores mapped to 0-100 (multiply average by 10).`;
+
+function parseCoachingContext(prefixText) {
+  const extract = (label) => {
+    const re = new RegExp(`${label}:\\s*"?([^"\\n]+)"?`);
+    const match = prefixText.match(re);
+    return match ? match[1].trim() : '';
+  };
+  return {
+    question: extract('NESTA QUESTION'),
+    userResponse: extract("USER'S ORIGINAL RESPONSE"),
+    status: extract('ASSESSMENT STATUS'),
+    gap: extract('IDENTIFIED GAP'),
+  };
+}
+
+function evaluateCoachingInBackground(coachingMeta, evalConversation) {
+  const conversationText = evalConversation
+    .map((m) => `${m.role === 'coach' ? 'COACH' : 'PRACTITIONER'}: ${m.content}`)
+    .join('\n\n');
+
+  const evalUserMessage = [
+    'Evaluate the following coaching conversation:',
+    '',
+    '## Context',
+    `**Nesta Question:** ${coachingMeta.question}`,
+    `**Practitioner's Original Response:** ${coachingMeta.userResponse}`,
+    `**Assessment Status:** ${coachingMeta.status}`,
+    `**Identified Gap:** ${coachingMeta.gap || 'None'}`,
+    '',
+    '## Coaching Conversation',
+    conversationText,
+    '',
+    'Evaluate this coaching conversation using the rubric and return structured JSON.',
+  ].join('\n');
+
+  openaiClient.chat.completions.create({
+    model: MODEL,
+    messages: [
+      { role: 'system', content: EVALUATE_COACHING_PROMPT },
+      { role: 'user', content: evalUserMessage },
+    ],
+    temperature: 0,
+  }).then((evalResponse) => {
+    const evalText = evalResponse.choices[0]?.message?.content || '';
+    const cleaned = evalText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    console.log('\n[coaching-eval] ── Coaching Evaluation ──');
+    console.log(`[coaching-eval] Question: ${coachingMeta.question}`);
+    console.log(`[coaching-eval] Status: ${coachingMeta.status}`);
+    console.log(`[coaching-eval] Overall Score: ${parsed.overall_score}/100`);
+    if (parsed.dimensions) {
+      const d = parsed.dimensions;
+      console.log(`[coaching-eval]   Socratic:    ${d.socratic_approach?.score ?? '?'}/10`);
+      console.log(`[coaching-eval]   Specificity: ${d.specificity?.score ?? '?'}/10`);
+      console.log(`[coaching-eval]   Evidence:    ${d.evidence_use?.score ?? '?'}/10`);
+      console.log(`[coaching-eval]   Warmth:      ${d.warmth_and_tone?.score ?? '?'}/10`);
+      console.log(`[coaching-eval]   Gap Target:  ${d.gap_targeting?.score ?? '?'}/10`);
+      console.log(`[coaching-eval]   Progression: ${d.progression?.score ?? '?'}/10`);
+    }
+    if (parsed.strengths?.length) {
+      console.log(`[coaching-eval] Strengths: ${parsed.strengths.join('; ')}`);
+    }
+    if (parsed.weaknesses?.length) {
+      console.log(`[coaching-eval] Weaknesses: ${parsed.weaknesses.join('; ')}`);
+    }
+    if (parsed.summary) {
+      console.log(`[coaching-eval] Summary: ${parsed.summary}`);
+    }
+    console.log('[coaching-eval] ── End ──\n');
+  }).catch((err) => {
+    console.error('[coaching-eval] Evaluation failed:', err.message);
+  });
 }
 
 // ── POST /api/chatbot ───────────────────────────────────────
@@ -318,7 +445,31 @@ app.post('/api/chatbot', async (req, res) => {
     }
 
     messages.push({ role: 'user', content: message });
+
     await resolveAndStream(res, messages);
+
+    // Detect coaching conversations from the COACHING_CONTEXT_PREFIX
+    // that CoachingChatPanel prepends to the conversation. If found,
+    // evaluate the coach's response in the background.
+    const contextEntry = Array.isArray(conversation)
+      && conversation.find((m) => m.content?.includes('[COACHING CONTEXT'));
+    if (contextEntry) {
+      const coachingMeta = parseCoachingContext(contextEntry.content);
+      const coachResponse = res._lastStreamedContent;
+
+      const evalConversation = [];
+      for (const m of conversation.slice(1)) {
+        evalConversation.push({
+          role: m.type === 'bot' ? 'coach' : 'user',
+          content: m.content,
+        });
+      }
+      if (coachResponse) {
+        evalConversation.push({ role: 'coach', content: coachResponse });
+      }
+
+      evaluateCoachingInBackground(coachingMeta, evalConversation);
+    }
   } catch (error) {
     console.error('Error processing chatbot message:', error);
     if (!res.headersSent) {
