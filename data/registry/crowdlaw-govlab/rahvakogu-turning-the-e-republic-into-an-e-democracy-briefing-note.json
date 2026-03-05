@@ -1,0 +1,8 @@
+{
+  "name": "Rahvakogu: Turning The E-Republic Into An E-Democracy (Briefing Note)",
+  "source": "Crowdlaw - GovLab",
+  "source_url": "https://congress.crowd.law/",
+  "doc_date": "",
+  "content": "## Rahvakogu: Turning The E-Republic Into An E-Democracy\n\n**Location:** Estonia\n**Implementation Level:** National\n\n### Overview\nRahvakogu ('People's Assembly') was a national CrowdLaw initiative in Estonia designed to engage citizens in political reform. The process combined online self-selection with an offline randomly selected sample of the population to produce more legitimate decision-making.\n\n### How It Works\nThe Rahvakogu process limited discussion to political reform, which led to concrete and specific proposals in a short time frame. The online process attracted mostly educated, wealthier males, which is why the organizers designed a second step using a random sample of the population to ensure broader demographic representation.\n\n### Key Features\n- Limiting discussion to a specific topic (political reform) produced more focused and actionable proposals\n- Combined online self-selection with offline randomly selected citizen panels\n- Designed explicitly to address demographic skew in online participation\n\n### Lessons Learned\n- Defining the topic clearly and asking specific questions leads to more relevant participation\n- Measuring diversity (age, gender, participation rates by location and occupation) is essential to understanding who is and isn't participating\n- Complementary offline processes can correct for demographic biases in online engagement",
+  "format": "markdown"
+}

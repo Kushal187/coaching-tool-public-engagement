@@ -1,0 +1,9 @@
+{
+  "name": "The DAO Hack",
+  "source": "Participedia Case Studies",
+  "source_url": "https://participedia.net/case/7375",
+  "doc_date": "2021-04-13",
+  "content_type": "case_study",
+  "content": "Problems and Purpose Background History and ContextThe DAO was probably the earliest DeFi project and its spectacular failure likely delayed the development of DeFi. The DAO pursued an automated investing strategy and had a decentralised system of governance.Organizing, Supporting, and Funding Entities Participant Recruitment and Selection Methods and Tools UsedThe DAO's smart contracts were vulnerable to a re-entrancy attack and this vulnerability was used to drain $60 million worth of ETH from the fund. This was about 40% of the total funds they had raised.What Went On: Process, Interaction, and Participation Influence, Outcomes, and EffectsThe magnitude of the hack made it a crisis for Ethereum and resulted in a hard fork of the Ethereum chain, to recover the lost funds. This was controversial within the Ethereum community and those who were opposed to the fork maintained Ethereum Classic as the continuation of the original Ethereum chain.Analysis and Lessons Learned See Also References External Links Notes",
+  "format": "markdown"
+}

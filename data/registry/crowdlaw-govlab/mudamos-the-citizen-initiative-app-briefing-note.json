@@ -1,0 +1,8 @@
+{
+  "name": "Mudamos: The Citizen Initiative App (Briefing Note)",
+  "source": "Crowdlaw - GovLab",
+  "source_url": "https://congress.crowd.law/",
+  "doc_date": "",
+  "content": "## Mudamos: The Citizen Initiative App\n\n**Location:** Brazil\n**Implementation Level:** National\n\n### Overview\nMudamos is a Brazilian citizen initiative app designed specifically to enable the public to draft their own bills and gather digital signatures in support of legislative proposals. The app connects citizen-drafted legislation to the formal lawmaking process of the Câmara dos Deputados (Brazilian legislature).\n\n### How It Works\nMudamos is a tool and process designed specifically for the public to draft their own bills and get others to sign onto them. The Câmara dos Deputados is constitutionally obliged to review citizen proposals that gather the requisite supporting signatures.\n\n### Key Features\n- A volunteer team of crowdsourced lawyers assists in the analysis of citizen submissions\n- Blockchain technology is being explored to enable verification of digital signatures on citizen petitions\n- Connects citizen-initiated legislation directly to constitutional review requirements\n\n### Lessons Learned\n- Tools designed for a specific stage of lawmaking (drafting) are more effective than general-purpose platforms\n- Turning good participation into great participation requires offering technical assistance — crowdsourced lawyers help citizens improve the quality of their submissions\n- Technology innovations like blockchain can address key barriers in digital democracy (petition verification)",
+  "format": "markdown"
+}

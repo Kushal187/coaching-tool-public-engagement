@@ -14,6 +14,7 @@ import {
   buildSourceDocuments,
 } from './lib/agent-tools.mjs';
 import { formatSSEChunk, formatSSESources, formatSSEDone } from './lib/sse.mjs';
+import adminRoutes from './lib/admin-routes.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -21,7 +22,7 @@ const PORT = process.env.PORT || 3000;
 const MODEL = process.env.CHATBOT_MODEL || 'gpt-4.1';
 const MAX_ITERATIONS = 5;
 
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -1195,6 +1196,10 @@ app.get('/api/case-studies', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch case studies.' });
   }
 });
+
+// ── Admin API ───────────────────────────────────────────────
+
+app.use('/api/admin', adminRoutes);
 
 // ── Static Files (production) ───────────────────────────────
 
