@@ -218,6 +218,12 @@ export function CoachingChatPanel({
         onStatusChange(id, 'addressed');
       }
 
+      try {
+        const prev = JSON.parse(sessionStorage.getItem('nestaCrossResolved') || '[]');
+        const merged = [...new Set([...prev, ...resolvedQuestionIds])];
+        sessionStorage.setItem('nestaCrossResolved', JSON.stringify(merged));
+      } catch { /* ignore */ }
+
       setMessages((prev) => [
         ...prev,
         {

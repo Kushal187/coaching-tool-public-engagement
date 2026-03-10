@@ -9,6 +9,7 @@ import {
   Loader2,
   Target,
   RefreshCw,
+  MessageSquare,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { Button } from './ui/button';
@@ -43,6 +44,7 @@ export function Reflection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [resolvedWithoutChat, setResolvedWithoutChat] = useState<Set<number>>(new Set());
+  const [resolvedViaCrossChat, setResolvedViaCrossChat] = useState<Set<number>>(new Set());
 
   const fetchReflection = async () => {
     setLoading(true);
@@ -68,12 +70,21 @@ export function Reflection() {
         }
       }
 
+      let crossResolved = new Set<number>();
+      try {
+        const saved = sessionStorage.getItem('nestaCrossResolved');
+        if (saved) crossResolved = new Set(JSON.parse(saved));
+      } catch { /* ignore */ }
+      setResolvedViaCrossChat(crossResolved);
+
       const noChat = new Set<number>();
       for (const ev of evaluations) {
         if (ev.status === 'addressed') {
           const chat = chatHistories[ev.questionId];
           const userMsgs = chat?.filter((m) => m.role === 'user') || [];
-          if (userMsgs.length === 0) noChat.add(ev.questionId);
+          if (userMsgs.length === 0 && !crossResolved.has(ev.questionId)) {
+            noChat.add(ev.questionId);
+          }
         }
       }
       setResolvedWithoutChat(noChat);
@@ -227,6 +238,16 @@ export function Reflection() {
           doc.setTextColor(146, 100, 0);
           doc.setFont('helvetica', 'bold');
           doc.text('\u26A0  Resolved without coaching conversation', margin + 3, y + 2);
+          y += 9;
+        } else if (highlightNoChat && resolvedViaCrossChat.has(item.questionId)) {
+          checkPage(10);
+          doc.setFillColor(228, 239, 252);
+          doc.setDrawColor(18, 77, 143);
+          doc.roundedRect(margin, y - 3, contentWidth, 8, 1.5, 1.5, 'FD');
+          doc.setFontSize(9);
+          doc.setTextColor(18, 77, 143);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Resolved through a different conversation', margin + 3, y + 2);
           y += 9;
         }
         writeWrapped(
@@ -386,20 +407,34 @@ export function Reflection() {
               </div>
             </div>
             <div className="space-y-5">
-              {reflection.addressed.map((item) => (
+              {reflection.addressed.map((item) => {
+                const isCrossResolved = resolvedViaCrossChat.has(item.questionId);
+                const isNoChat = resolvedWithoutChat.has(item.questionId);
+
+                return (
                 <div
                   key={item.questionId}
                   className={`rounded-lg p-5 ${
-                    resolvedWithoutChat.has(item.questionId)
+                    isNoChat
                       ? 'bg-amber-50 border-2 border-amber-400'
-                      : 'bg-white/60'
+                      : isCrossResolved
+                        ? 'bg-blue-50/60 border border-[#124D8F]/20'
+                        : 'bg-white/60'
                   }`}
                 >
-                  {resolvedWithoutChat.has(item.questionId) && (
+                  {isNoChat && (
                     <div className="flex items-center gap-2 mb-3 bg-amber-100 border border-amber-300 rounded-md px-3 py-2">
                       <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
                       <span className="text-sm font-bold text-amber-800">
                         Resolved without coaching conversation
+                      </span>
+                    </div>
+                  )}
+                  {isCrossResolved && !isNoChat && (
+                    <div className="flex items-center gap-2 mb-3 bg-[#E4EFFC] border border-[#124D8F]/20 rounded-md px-3 py-2">
+                      <MessageSquare className="w-4 h-4 text-[#124D8F] flex-shrink-0" />
+                      <span className="text-sm font-bold text-[#124D8F]">
+                        Resolved through a different conversation
                       </span>
                     </div>
                   )}
@@ -410,7 +445,8 @@ export function Reflection() {
                     <MarkdownContent compact>{item.analysis}</MarkdownContent>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
