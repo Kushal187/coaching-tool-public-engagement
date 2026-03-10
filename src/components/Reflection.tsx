@@ -10,6 +10,7 @@ import {
   Target,
   RefreshCw,
   MessageSquare,
+  ClipboardCheck,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { Button } from './ui/button';
@@ -45,6 +46,7 @@ export function Reflection() {
   const [error, setError] = useState('');
   const [resolvedWithoutChat, setResolvedWithoutChat] = useState<Set<number>>(new Set());
   const [resolvedViaCrossChat, setResolvedViaCrossChat] = useState<Set<number>>(new Set());
+  const [resolvedInAssessment, setResolvedInAssessment] = useState<Set<number>>(new Set());
 
   const fetchReflection = async () => {
     setLoading(true);
@@ -77,17 +79,29 @@ export function Reflection() {
       } catch { /* ignore */ }
       setResolvedViaCrossChat(crossResolved);
 
+      let initiallyAddressed = new Set<number>();
+      try {
+        const saved = sessionStorage.getItem('nestaInitiallyAddressed');
+        if (saved) initiallyAddressed = new Set(JSON.parse(saved));
+      } catch { /* ignore */ }
+
       const noChat = new Set<number>();
+      const fromAssessment = new Set<number>();
       for (const ev of evaluations) {
         if (ev.status === 'addressed') {
           const chat = chatHistories[ev.questionId];
           const userMsgs = chat?.filter((m) => m.role === 'user') || [];
           if (userMsgs.length === 0 && !crossResolved.has(ev.questionId)) {
-            noChat.add(ev.questionId);
+            if (initiallyAddressed.has(ev.questionId)) {
+              fromAssessment.add(ev.questionId);
+            } else {
+              noChat.add(ev.questionId);
+            }
           }
         }
       }
       setResolvedWithoutChat(noChat);
+      setResolvedInAssessment(fromAssessment);
 
       const res = await fetch('/api/generate-reflection', {
         method: 'POST',
@@ -248,6 +262,16 @@ export function Reflection() {
           doc.setTextColor(18, 77, 143);
           doc.setFont('helvetica', 'bold');
           doc.text('Resolved through a different conversation', margin + 3, y + 2);
+          y += 9;
+        } else if (highlightNoChat && resolvedInAssessment.has(item.questionId)) {
+          checkPage(10);
+          doc.setFillColor(230, 245, 241);
+          doc.setDrawColor(9, 114, 97);
+          doc.roundedRect(margin, y - 3, contentWidth, 8, 1.5, 1.5, 'FD');
+          doc.setFontSize(9);
+          doc.setTextColor(9, 114, 97);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Resolved in the Coaching Assessment', margin + 3, y + 2);
           y += 9;
         }
         writeWrapped(
@@ -410,6 +434,7 @@ export function Reflection() {
               {reflection.addressed.map((item) => {
                 const isCrossResolved = resolvedViaCrossChat.has(item.questionId);
                 const isNoChat = resolvedWithoutChat.has(item.questionId);
+                const isFromAssessment = resolvedInAssessment.has(item.questionId);
 
                 return (
                 <div
@@ -419,7 +444,9 @@ export function Reflection() {
                       ? 'bg-amber-50 border-2 border-amber-400'
                       : isCrossResolved
                         ? 'bg-blue-50/60 border border-[#124D8F]/20'
-                        : 'bg-white/60'
+                        : isFromAssessment
+                          ? 'bg-[#097261]/5 border border-[#097261]/20'
+                          : 'bg-white/60'
                   }`}
                 >
                   {isNoChat && (
@@ -435,6 +462,14 @@ export function Reflection() {
                       <MessageSquare className="w-4 h-4 text-[#124D8F] flex-shrink-0" />
                       <span className="text-sm font-bold text-[#124D8F]">
                         Resolved through a different conversation
+                      </span>
+                    </div>
+                  )}
+                  {isFromAssessment && (
+                    <div className="flex items-center gap-2 mb-3 bg-[#097261]/10 border border-[#097261]/20 rounded-md px-3 py-2">
+                      <ClipboardCheck className="w-4 h-4 text-[#097261] flex-shrink-0" />
+                      <span className="text-sm font-bold text-[#097261]">
+                        Resolved in the Coaching Assessment
                       </span>
                     </div>
                   )}
