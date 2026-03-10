@@ -91,6 +91,12 @@ export function AssessmentDashboard() {
       try {
         const evals: AssessmentCard[] = JSON.parse(savedEvaluations);
         setCards(evals);
+        if (!sessionStorage.getItem('nestaInitiallyAddressed')) {
+          const initiallyAddressed = evals
+            .filter((e) => e.status === 'addressed')
+            .map((e) => e.questionId);
+          sessionStorage.setItem('nestaInitiallyAddressed', JSON.stringify(initiallyAddressed));
+        }
         setLoading(false);
         return;
       } catch {
@@ -117,6 +123,10 @@ export function AssessmentDashboard() {
         'nestaEvaluations',
         JSON.stringify(data.evaluations),
       );
+      const initiallyAddressed = data.evaluations
+        .filter((e: AssessmentCard) => e.status === 'addressed')
+        .map((e: AssessmentCard) => e.questionId);
+      sessionStorage.setItem('nestaInitiallyAddressed', JSON.stringify(initiallyAddressed));
     } catch (err) {
       console.error('Failed to load evaluations:', err);
       setError('Failed to load your assessment. Please try again.');

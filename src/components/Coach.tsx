@@ -222,6 +222,10 @@ export function Coach() {
 
       const data = await res.json();
       sessionStorage.setItem('nestaEvaluations', JSON.stringify(data.evaluations));
+      const initiallyAddressed = data.evaluations
+        .filter((e: { status: string }) => e.status === 'addressed')
+        .map((e: { questionId: number }) => e.questionId);
+      sessionStorage.setItem('nestaInitiallyAddressed', JSON.stringify(initiallyAddressed));
       navigate('/coach/dashboard');
     } catch (err) {
       console.error('Assessment evaluation failed:', err);
