@@ -408,6 +408,7 @@ export function AssessmentDashboard() {
       {selectedCard && (
         <CoachingChatPanel
           card={selectedCard}
+          allCards={cards}
           userResponse={responses[selectedCard.questionId] || ''}
           onClose={() => setSelectedCard(null)}
           onStatusChange={handleStatusChange}
