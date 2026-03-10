@@ -19,7 +19,7 @@ import adminRoutes from './lib/admin-routes.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
-const MODEL = process.env.CHATBOT_MODEL || 'gpt-4.1';
+const MODEL = process.env.CHATBOT_MODEL || 'gpt-5.1';
 const MAX_ITERATIONS = 5;
 
 app.use(express.json({ limit: '50mb' }));
