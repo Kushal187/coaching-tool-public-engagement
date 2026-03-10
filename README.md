@@ -34,7 +34,7 @@ documents/*.pdf
 
 The ingestion uses an **LLM-based intelligent chunking** approach (adapted from `DocumentTreeSplitAgent`):
 
-1. The full document (with line numbers) is sent to GPT-4.1 to devise a chapter-based splitting strategy
+1. The full document (with line numbers) is sent to GPT-5.1 to devise a chapter-based splitting strategy
 2. A second LLM call reviews and validates the strategy (PASSES / FAILS)
 3. If the review fails, the strategy is regenerated with the feedback (up to 5 retries)
 4. Chapters exceeding 50 lines are recursively sub-chunked

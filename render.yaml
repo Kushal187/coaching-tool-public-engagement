@@ -19,6 +19,6 @@ services:
       - key: WEAVIATE_API_KEY
         sync: false
       - key: CHATBOT_MODEL
-        value: gpt-4.1
+        value: gpt-5.1
       - key: CHATBOT_MAX_RESULTS
         value: 5

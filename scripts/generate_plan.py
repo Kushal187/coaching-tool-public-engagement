@@ -120,7 +120,7 @@ for i, w in enumerate(col_widths_1, 1):
     ws1.column_dimensions[get_column_letter(i)].width = w
 
 apply_title_row(ws1, 1, "InnovateUS Public Engagement Coaching Tool — Daily Build Plan")
-apply_subtitle_row(ws1, 2, "Feb 9 – Mar 16, 2026  |  Kushal + Manan + Batuhan  |  ~18 Working Days  |  OpenAI GPT-4.1 + Weaviate RAG")
+apply_subtitle_row(ws1, 2, "Feb 9 – Mar 16, 2026  |  Kushal + Manan + Batuhan  |  ~18 Working Days  |  OpenAI GPT-5.1 + Weaviate RAG")
 ws1.row_dimensions[1].height = 30
 ws1.row_dimensions[2].height = 22
 
@@ -201,7 +201,7 @@ for c in range(2, 4):
 ws1.cell(row=total_row, column=4, value="18 days").font = bold_font
 ws1.cell(row=total_row, column=4).fill = light_fill
 ws1.cell(row=total_row, column=4).border = thin_border
-ws1.cell(row=total_row, column=5, value="Strategy: OpenAI GPT-4.1 + Weaviate RAG from day one → Express backend → Render deploy").font = bold_font
+ws1.cell(row=total_row, column=5, value="Strategy: OpenAI GPT-5.1 + Weaviate RAG from day one → Express backend → Render deploy").font = bold_font
 ws1.cell(row=total_row, column=5).fill = light_fill
 ws1.cell(row=total_row, column=5).border = thin_border
 ws1.cell(row=total_row, column=5).alignment = wrap_align
@@ -234,7 +234,7 @@ tech_data = [
     ["Routing", "React Router 7", "Standard React routing with nested routes", "Confirmed", "TanStack Router"],
     ["Backend", "Express 5 (Node.js)", "Simple REST APIs, SSE streaming support, JS end-to-end", "Confirmed", "Netlify Functions (abandoned), FastAPI"],
     ["Vector Database", "Weaviate (Cloud)", "Hybrid search (BM25 + vector), built-in OpenAI vectorizer module", "Confirmed", "Pinecone, Qdrant, ChromaDB"],
-    ["AI / LLM", "OpenAI GPT-4.1 / GPT-4.1-mini", "High quality coaching responses, function calling for agent tools", "Confirmed", "Claude, Gemini"],
+    ["AI / LLM", "OpenAI GPT-5.1 / GPT-5.1-mini", "High quality coaching responses, function calling for agent tools", "Confirmed", "Claude, Gemini"],
     ["Embeddings", "text-embedding-3-small (via Weaviate)", "Cost-efficient, good quality, integrated with Weaviate vectorizer", "Confirmed", "text-embedding-3-large"],
     ["PDF Ingestion", "Docling (Python) + custom Node.js pipeline", "PDF → Markdown → LLM-based chunking → Weaviate", "Confirmed", "LangChain, LlamaIndex"],
     ["Excel Ingestion", "pandas + openpyxl (Python)", "Participedia case study data from Excel → Weaviate", "Confirmed", "SheetJS"],

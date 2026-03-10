@@ -72,8 +72,8 @@ MARKDOWN_HEADING_RE = re.compile(r"^(#{1,4})\s+(.+)$")
 DOCUMENT_ID_NAMESPACE = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 
 # LLM config
-CLASSIFICATION_MODEL = "gpt-4.1-mini"
-SUMMARY_MODEL = "gpt-4.1-mini"
+CLASSIFICATION_MODEL = "gpt-5.1-mini"
+SUMMARY_MODEL = "gpt-5.1-mini"
 SCRIPT_DIR = Path(__file__).resolve().parent
 CLASSIFICATION_CACHE_FILE = SCRIPT_DIR / "classification_cache.json"
 CASE_STUDY_CACHE_FILE = SCRIPT_DIR / "case_study_summaries_cache.json"

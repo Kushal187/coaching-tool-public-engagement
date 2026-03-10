@@ -19,7 +19,7 @@ import adminRoutes from './lib/admin-routes.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
-const MODEL = process.env.CHATBOT_MODEL || 'gpt-4.1';
+const MODEL = process.env.CHATBOT_MODEL || 'gpt-5.1';
 const MAX_ITERATIONS = 5;
 
 app.use(express.json({ limit: '50mb' }));
@@ -476,6 +476,75 @@ app.post('/api/chatbot', async (req, res) => {
       return res.status(500).json({ error: 'An error occurred processing your message.' });
     }
     res.end();
+  }
+});
+
+// ── POST /api/analyze-cross-resolution ──────────────────────
+
+const CROSS_RESOLUTION_PROMPT = `You are an evaluator that determines whether a coaching conversation has substantively addressed assessment gaps from OTHER Nesta framework questions.
+
+You will receive:
+1. A coaching conversation transcript (about a specific Nesta question).
+2. A list of OTHER unresolved assessment cards, each with a question and an identified gap.
+
+For each unresolved card, decide whether the conversation has **directly and substantively** addressed that card's specific gap. Be CONSERVATIVE:
+- The conversation must contain a concrete, actionable discussion that closes the gap — not just a passing mention.
+- If the gap says the user hasn't identified participants, the conversation must show the user articulating who their participants are.
+- Tangential references or vague overlap do NOT count.
+
+Return ONLY a JSON object: { "resolvedQuestionIds": [<numbers>] }
+If no other cards are resolved, return: { "resolvedQuestionIds": [] }
+Do NOT include the current question's ID. Return raw JSON with no markdown fences.`;
+
+app.post('/api/analyze-cross-resolution', async (req, res) => {
+  const { conversation, currentQuestionId, unresolvedCards } = req.body;
+
+  if (!Array.isArray(conversation) || !Array.isArray(unresolvedCards) || unresolvedCards.length === 0) {
+    return res.json({ resolvedQuestionIds: [] });
+  }
+
+  try {
+    const transcript = conversation
+      .map((m) => `${m.role === 'user' ? 'PRACTITIONER' : 'COACH'}: ${m.content}`)
+      .join('\n\n');
+
+    const cardsList = unresolvedCards
+      .map((c) => `- Question ${c.questionId}: "${c.question}" | Gap: "${c.gap}"`)
+      .join('\n');
+
+    const userMessage = [
+      `## Current Coaching Conversation (Question ${currentQuestionId})`,
+      '',
+      transcript,
+      '',
+      '## Other Unresolved Assessment Cards',
+      '',
+      cardsList,
+      '',
+      'Which of these other cards (if any) has the conversation substantively resolved? Return JSON.',
+    ].join('\n');
+
+    const response = await openaiClient.chat.completions.create({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: CROSS_RESOLUTION_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
+      temperature: 0,
+    });
+
+    const text = (response.choices[0]?.message?.content || '').trim();
+    const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    const ids = (parsed.resolvedQuestionIds || []).filter(
+      (id) => typeof id === 'number' && id !== currentQuestionId,
+    );
+
+    console.log(`[cross-resolution] Q${currentQuestionId} → resolved others: [${ids.join(', ')}]`);
+    return res.json({ resolvedQuestionIds: ids });
+  } catch (err) {
+    console.error('[cross-resolution] Analysis failed:', err.message);
+    return res.json({ resolvedQuestionIds: [] });
   }
 });
 

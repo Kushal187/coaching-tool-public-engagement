@@ -25,6 +25,7 @@ interface Message {
 
 interface CoachingChatPanelProps {
   card: AssessmentCard;
+  allCards: AssessmentCard[];
   userResponse: string;
   onClose: () => void;
   onStatusChange: (questionId: number, newStatus: CardStatus) => void;
@@ -68,6 +69,7 @@ const COACHING_CONTEXT_PREFIX = (
 
 export function CoachingChatPanel({
   card,
+  allCards,
   userResponse,
   onClose,
   onStatusChange,
@@ -160,7 +162,9 @@ export function CoachingChatPanel({
       }
 
       if (botContent) {
-        setMessages((prev) => [...prev, { role: 'ai', content: botContent }]);
+        const updatedMessages: Message[] = [...newMessages, { role: 'ai', content: botContent }];
+        setMessages(updatedMessages);
+        analyzeCrossResolution(updatedMessages);
       }
     } catch (err) {
       console.error('Coaching chat error:', err);
@@ -173,6 +177,63 @@ export function CoachingChatPanel({
       ]);
     } finally {
       setStreaming(false);
+    }
+  };
+
+  const analyzeCrossResolution = async (msgs: Message[]) => {
+    const unresolvedCards = allCards
+      .filter((c) => c.status !== 'addressed' && c.questionId !== card.questionId)
+      .map((c) => ({ questionId: c.questionId, question: c.question, gap: c.gap }));
+
+    if (unresolvedCards.length === 0) return;
+
+    try {
+      const conversationForAnalysis = msgs
+        .filter((m) => m.role === 'user' || m.role === 'ai')
+        .map((m) => ({ role: m.role === 'ai' ? 'coach' : 'user', content: m.content }));
+
+      const res = await fetch('/api/analyze-cross-resolution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation: conversationForAnalysis,
+          currentQuestionId: card.questionId,
+          unresolvedCards,
+        }),
+      });
+
+      if (!res.ok) return;
+
+      const { resolvedQuestionIds } = await res.json();
+      if (!Array.isArray(resolvedQuestionIds) || resolvedQuestionIds.length === 0) return;
+
+      const resolvedNames = resolvedQuestionIds
+        .map((id: number) => {
+          const c = allCards.find((ac) => ac.questionId === id);
+          return c ? `**Q${id}:** ${c.question}` : `Q${id}`;
+        })
+        .join('\n- ');
+
+      for (const id of resolvedQuestionIds) {
+        onStatusChange(id, 'addressed');
+      }
+
+      try {
+        const prev = JSON.parse(sessionStorage.getItem('nestaCrossResolved') || '[]');
+        const merged = [...new Set([...prev, ...resolvedQuestionIds])];
+        sessionStorage.setItem('nestaCrossResolved', JSON.stringify(merged));
+      } catch { /* ignore */ }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'ai',
+          content:
+            `Based on our conversation, the following assessment question${resolvedQuestionIds.length > 1 ? 's were' : ' was'} also resolved:\n\n- ${resolvedNames}\n\nYou can revisit ${resolvedQuestionIds.length > 1 ? 'them' : 'it'} from the dashboard if needed.`,
+        },
+      ]);
+    } catch {
+      /* cross-resolution is best-effort; don't disrupt the chat */
     }
   };
 
