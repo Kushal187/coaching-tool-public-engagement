@@ -24,9 +24,9 @@ function renderLayout(route = '/') {
 describe('Layout', () => {
   it('renders the app title linking to home', () => {
     renderLayout();
-    const titleLink = screen.getByText('Public Engagement Coach');
-    expect(titleLink).toBeInTheDocument();
-    expect(titleLink.closest('a')).toHaveAttribute('href', '/');
+    const titles = screen.getAllByText('Public Engagement Coach');
+    const navTitle = titles.find((el) => el.closest('a')?.getAttribute('href') === '/');
+    expect(navTitle).toBeTruthy();
   });
 
   it('renders nav links for Coach and Case Studies', () => {
@@ -35,8 +35,9 @@ describe('Layout', () => {
     const navCoach = coachLinks.find((l) => l.getAttribute('href') === '/coach');
     expect(navCoach).toBeTruthy();
 
-    const csLink = screen.getByRole('link', { name: /Case Studies/i });
-    expect(csLink).toHaveAttribute('href', '/case-studies');
+    const csLinks = screen.getAllByRole('link', { name: /Case Studies/i });
+    const navCs = csLinks.find((l) => l.getAttribute('href') === '/case-studies');
+    expect(navCs).toBeTruthy();
   });
 
   it('renders the ChatBot component', () => {

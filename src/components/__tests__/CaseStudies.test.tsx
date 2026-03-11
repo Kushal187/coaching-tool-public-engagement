@@ -56,7 +56,7 @@ describe('CaseStudies', () => {
       () => new Promise(() => {}),
     );
     renderCaseStudies();
-    expect(screen.getByText('Loading case studies…')).toBeInTheDocument();
+    expect(screen.getByText('Loading case studies...')).toBeInTheDocument();
   });
 
   it('renders case studies after successful fetch', async () => {
@@ -237,7 +237,7 @@ describe('CaseStudies', () => {
     });
 
     const selects = screen.getAllByRole('combobox');
-    await user.selectOptions(selects[1], 'Health Services');
+    await user.selectOptions(selects[1], 'Health & Public Health');
     await user.selectOptions(selects[0], 'large');
 
     expect(
