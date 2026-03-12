@@ -14,23 +14,18 @@ import {
 } from './CoachingChatPanel';
 import type { NestaResponses } from './Coach';
 
-function getStatusColor(status: CardStatus) {
-  switch (status) {
-    case 'addressed':
-      return { text: 'text-[#097261]', label: 'Addressed' };
-    case 'partial':
-      return { text: 'text-[#D09006]', label: 'Partial' };
-    case 'not-addressed':
-      return { text: 'text-[#6B7280]', label: 'Not Addressed' };
-  }
-}
+const STATUS_GROUPS: { status: CardStatus; label: string; color: string }[] = [
+  { status: 'partial', label: 'Partial', color: 'text-[#D09006]' },
+  { status: 'not-addressed', label: 'Not Addressed', color: 'text-[#6B7280]' },
+  { status: 'addressed', label: 'Addressed', color: 'text-[#097261]' },
+];
 
 export function AssessmentDashboard() {
   const navigate = useNavigate();
   const [cards, setCards] = useState<AssessmentCard[]>([]);
   const [responses, setResponses] = useState<NestaResponses>({});
   const [selectedCard, setSelectedCard] = useState<AssessmentCard | null>(null);
-  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<CardStatus>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -96,6 +91,18 @@ export function AssessmentDashboard() {
 
   const handleCardClick = (card: AssessmentCard) => {
     setSelectedCard(card);
+  };
+
+  const toggleGroup = (status: CardStatus) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      return next;
+    });
   };
 
   const handleStatusChange = (questionId: number, newStatus: CardStatus) => {
@@ -173,76 +180,60 @@ export function AssessmentDashboard() {
           </div>
         </div>
 
-        {/* Accordion question list */}
+        {/* Grouped accordion */}
         <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-3">
-          {cards.map((card) => {
-            const status = getStatusColor(card.status);
-            const isSelected = selectedCard?.questionId === card.questionId;
-            const isExpanded = expandedCards.has(card.questionId);
+          {STATUS_GROUPS.map(({ status, label, color }) => {
+            const groupCards = cards.filter((c) => c.status === status);
+            if (groupCards.length === 0) return null;
+            const isCollapsed = collapsedGroups.has(status);
 
             return (
-              <div
-                key={card.questionId}
-                className={`rounded-xl border transition-all ${
-                  isSelected
-                    ? 'border-[#124D8F] bg-white shadow-md ring-1 ring-[#124D8F]/20'
-                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
-                }`}
-              >
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleCardClick(card)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleCardClick(card);
-                    }
-                  }}
-                  className="w-full text-left p-4 cursor-pointer"
+              <div key={status} className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(status)}
+                  className="w-full flex items-center justify-between px-5 py-4 cursor-pointer group"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <span className={`text-xs font-semibold ${status.text}`}>
-                        {status.label}
-                      </span>
-                      <p className="mt-1.5 text-sm font-semibold text-gray-800 leading-snug">
-                        {card.questionId}. {card.question}
-                      </p>
-                    </div>
-                    {card.gap && (
+                  <span className={`text-sm font-semibold ${color}`}>
+                    {label} ({groupCards.length})
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:text-gray-600 ${
+                      isCollapsed ? '-rotate-90' : ''
+                    }`}
+                  />
+                </button>
+
+                <div
+                  className="border-t border-gray-100 overflow-hidden transition-all duration-300 ease-in-out"
+                  style={{
+                    maxHeight: isCollapsed ? '0px' : `${groupCards.length * 60}px`,
+                    opacity: isCollapsed ? 0 : 1,
+                  }}
+                >
+                  {groupCards.map((card, idx) => {
+                    const isSelected = selectedCard?.questionId === card.questionId;
+
+                    return (
                       <button
+                        key={card.questionId}
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExpandedCards((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(card.questionId)) {
-                              next.delete(card.questionId);
-                            } else {
-                              next.add(card.questionId);
-                            }
-                            return next;
-                          });
-                        }}
-                        className="mt-1 p-1 rounded-md hover:bg-gray-100 transition-colors flex-shrink-0 cursor-pointer"
+                        onClick={() => handleCardClick(card)}
+                        className={`w-full text-left px-5 py-3.5 transition-colors cursor-pointer ${
+                          idx < groupCards.length - 1 ? 'border-b border-gray-100' : ''
+                        } ${
+                          isSelected
+                            ? 'bg-[#E4EFFC]'
+                            : 'hover:bg-gray-50'
+                        }`}
                       >
-                        <ChevronDown
-                          className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
-                            isExpanded ? 'rotate-180' : ''
-                          }`}
-                        />
+                        <p className="text-sm font-semibold text-gray-800 leading-snug">
+                          {card.questionId}. {card.question}
+                        </p>
                       </button>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
-                {isExpanded && card.gap && (
-                  <div className="px-4 pb-4 -mt-1">
-                    <p className="text-xs text-gray-500 leading-relaxed">
-                      {card.gap}
-                    </p>
-                  </div>
-                )}
               </div>
             );
           })}

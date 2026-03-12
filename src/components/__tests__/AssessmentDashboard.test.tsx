@@ -71,7 +71,7 @@ describe('AssessmentDashboard', () => {
     expect(screen.getByText(/7\/9 addressed/)).toBeInTheDocument();
   });
 
-  it('shows all status labels on accordion items', async () => {
+  it('shows status group headers with counts', async () => {
     sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
     sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
 
@@ -81,10 +81,9 @@ describe('AssessmentDashboard', () => {
       expect(screen.getByText('Assessment Dashboard')).toBeInTheDocument();
     });
 
-    const addressed = screen.getAllByText('Addressed');
-    expect(addressed.length).toBe(7);
-    expect(screen.getByText('Partial')).toBeInTheDocument();
-    expect(screen.getByText('Not Addressed')).toBeInTheDocument();
+    expect(screen.getByText('Addressed (7)')).toBeInTheDocument();
+    expect(screen.getByText('Partial (1)')).toBeInTheDocument();
+    expect(screen.getByText('Not Addressed (1)')).toBeInTheDocument();
   });
 
   it('shows placeholder when no question is selected', async () => {

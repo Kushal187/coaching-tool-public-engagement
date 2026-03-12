@@ -79,9 +79,7 @@ export function CoachingChatPanel({
   });
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const shouldScrollRef = useRef(false);
 
   useEffect(() => {
     setCurrentStatus(card.status);
@@ -92,14 +90,7 @@ export function CoachingChatPanel({
       setMessages([{ role: 'ai' as const, content: card.coachingContext }]);
     }
     setInput('');
-    shouldScrollRef.current = false;
   }, [card.questionId, card.status, card.coachingContext]);
-
-  useEffect(() => {
-    if (shouldScrollRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -134,7 +125,6 @@ export function CoachingChatPanel({
     const text = input.trim();
     if (!text || streaming) return;
 
-    shouldScrollRef.current = true;
     const newMessages: Message[] = [
       ...messages,
       { role: 'user', content: text },
@@ -330,7 +320,6 @@ export function CoachingChatPanel({
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
