@@ -39,7 +39,6 @@ const defaultProps = {
   card: MOCK_CARD,
   allCards: MOCK_ALL_CARDS,
   userResponse: 'I think incentives might help get people involved.',
-  onClose: vi.fn(),
   onStatusChange: vi.fn(),
 };
 
@@ -54,7 +53,6 @@ describe('CoachingChatPanel', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     sessionStorage.clear();
-    // Mock cross-resolution endpoint to return no resolved questions by default
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url === '/api/analyze-cross-resolution') {
         return Promise.resolve({
@@ -196,29 +194,6 @@ describe('CoachingChatPanel', () => {
       await user.click(screen.getByText('Mark as Resolved'));
 
       expect(screen.getByText('Mark as Unresolved')).toBeInTheDocument();
-    });
-  });
-
-  describe('Close', () => {
-    it('calls onClose when backdrop is clicked', async () => {
-      const user = userEvent.setup();
-      render(<CoachingChatPanel {...defaultProps} />);
-
-      const backdrop = document.querySelector('.fixed.inset-0') as HTMLElement;
-      await user.click(backdrop);
-
-      expect(defaultProps.onClose).toHaveBeenCalled();
-    });
-
-    it('calls onClose when X button is clicked', async () => {
-      const user = userEvent.setup();
-      render(<CoachingChatPanel {...defaultProps} />);
-
-      const buttons = screen.getAllByRole('button');
-      const closeBtn = buttons.find((b) => b.querySelector('.lucide-x'));
-      if (closeBtn) await user.click(closeBtn);
-
-      expect(defaultProps.onClose).toHaveBeenCalled();
     });
   });
 

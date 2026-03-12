@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  X,
   Send,
   Loader2,
   CheckCircle2,
@@ -27,7 +26,6 @@ interface CoachingChatPanelProps {
   card: AssessmentCard;
   allCards: AssessmentCard[];
   userResponse: string;
-  onClose: () => void;
   onStatusChange: (questionId: number, newStatus: CardStatus) => void;
 }
 
@@ -71,7 +69,6 @@ export function CoachingChatPanel({
   card,
   allCards,
   userResponse,
-  onClose,
   onStatusChange,
 }: CoachingChatPanelProps) {
   const [currentStatus, setCurrentStatus] = useState<CardStatus>(card.status);
@@ -84,18 +81,29 @@ export function CoachingChatPanel({
   const [streaming, setStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const shouldScrollRef = useRef(false);
 
   useEffect(() => {
     setCurrentStatus(card.status);
-  }, [card.status]);
+    const saved = loadChatHistory(card.questionId);
+    if (saved && saved.length > 0) {
+      setMessages(saved);
+    } else {
+      setMessages([{ role: 'ai' as const, content: card.coachingContext }]);
+    }
+    setInput('');
+    shouldScrollRef.current = false;
+  }, [card.questionId, card.status, card.coachingContext]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (shouldScrollRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   useEffect(() => {
     inputRef.current?.focus();
-  }, []);
+  }, [card.questionId]);
 
   useEffect(() => {
     saveChatHistory(card.questionId, messages);
@@ -126,6 +134,7 @@ export function CoachingChatPanel({
     const text = input.trim();
     if (!text || streaming) return;
 
+    shouldScrollRef.current = true;
     const newMessages: Message[] = [
       ...messages,
       { role: 'user', content: text },
@@ -250,126 +259,108 @@ export function CoachingChatPanel({
   const isResolved = currentStatus === 'addressed';
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/40 z-40 transition-opacity"
-        onClick={onClose}
-      />
+    <div className="h-full bg-white flex flex-col">
+      {/* Header */}
+      <div className="bg-[#124D8F] text-white p-5 flex-shrink-0">
+        <h2
+          className="text-lg mb-1"
+          style={{ fontFamily: "'DM Serif Display', serif" }}
+        >
+          Coaching Chat
+        </h2>
+        <p className="text-sm opacity-90">{card.question}</p>
+      </div>
 
-      {/* Slide-over panel */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-[500px] bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
-        {/* Header */}
-        <div className="bg-[#124D8F] text-white p-6 flex items-start justify-between flex-shrink-0">
-          <div className="flex-1 pr-4">
-            <h2
-              className="text-xl mb-2"
-              style={{ fontFamily: "'DM Serif Display', serif" }}
-            >
-              Coaching Chat
-            </h2>
-            <p className="text-sm opacity-90">{card.question}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Status toggle */}
-        <div className="px-6 pt-4 pb-2 border-b flex-shrink-0">
-          <button
-            type="button"
-            onClick={handleToggleStatus}
-            className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg transition-colors cursor-pointer font-semibold ${
-              isResolved
-                ? 'bg-amber-50 text-[#D09006] border-2 border-[#D09006] hover:bg-amber-100'
-                : 'bg-[#097261] text-white hover:bg-[#097261]/90'
-            }`}
-          >
-            {isResolved ? (
-              <>
-                <RotateCcw className="w-5 h-5" />
-                Mark as Unresolved
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-5 h-5" />
-                Mark as Resolved
-              </>
-            )}
-          </button>
-          {isResolved && (
-            <p className="text-xs text-gray-400 text-center mt-2">
-              You can continue chatting or close the panel
-            </p>
+      {/* Status toggle */}
+      <div className="px-5 pt-3 pb-2 border-b flex-shrink-0">
+        <button
+          type="button"
+          onClick={handleToggleStatus}
+          className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg transition-colors cursor-pointer font-semibold text-sm ${
+            isResolved
+              ? 'bg-amber-50 text-[#D09006] border-2 border-[#D09006] hover:bg-amber-100'
+              : 'bg-[#097261] text-white hover:bg-[#097261]/90'
+          }`}
+        >
+          {isResolved ? (
+            <>
+              <RotateCcw className="w-4 h-4" />
+              Mark as Unresolved
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="w-4 h-4" />
+              Mark as Resolved
+            </>
           )}
-        </div>
+        </button>
+        {isResolved && (
+          <p className="text-xs text-gray-400 text-center mt-1.5">
+            You can continue chatting
+          </p>
+        )}
+      </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map((message, index) => (
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        {messages.map((message, index) => (
+          <div
+            key={index}
+            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
             <div
-              key={index}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`max-w-[85%] p-4 rounded-xl ${
+                message.role === 'user'
+                  ? 'bg-[#124D8F] text-white'
+                  : 'bg-[#E4EFFC] text-gray-800'
+              }`}
             >
-              <div
-                className={`max-w-[85%] p-4 rounded-xl ${
-                  message.role === 'user'
-                    ? 'bg-[#124D8F] text-white'
-                    : 'bg-[#E4EFFC] text-gray-800'
-                }`}
-              >
-                {message.role === 'ai' ? (
-                  <MarkdownContent>{message.content}</MarkdownContent>
-                ) : (
-                  <p className="leading-relaxed">{message.content}</p>
-                )}
-              </div>
+              {message.role === 'ai' ? (
+                <MarkdownContent>{message.content}</MarkdownContent>
+              ) : (
+                <p className="leading-relaxed">{message.content}</p>
+              )}
             </div>
-          ))}
-          {streaming && (
-            <div className="flex justify-start">
-              <div className="bg-[#E4EFFC] text-gray-800 p-4 rounded-xl">
-                <Loader2 className="w-5 h-5 animate-spin text-[#124D8F]" />
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input */}
-        <div className="p-6 border-t flex-shrink-0">
-          <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Type your response..."
-              disabled={streaming}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#124D8F] disabled:opacity-50"
-            />
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!input.trim() || streaming}
-              className="bg-[#124D8F] text-white px-5 py-3 rounded-lg hover:bg-[#097261] transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Send className="w-5 h-5" />
-            </button>
           </div>
+        ))}
+        {streaming && (
+          <div className="flex justify-start">
+            <div className="bg-[#E4EFFC] text-gray-800 p-4 rounded-xl">
+              <Loader2 className="w-5 h-5 animate-spin text-[#124D8F]" />
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <div className="p-5 border-t flex-shrink-0">
+        <div className="flex gap-2">
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder="Type your response..."
+            disabled={streaming}
+            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#124D8F] disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={!input.trim() || streaming}
+            className="bg-[#124D8F] text-white px-5 py-3 rounded-lg hover:bg-[#097261] transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Send className="w-5 h-5" />
+          </button>
         </div>
       </div>
-    </>
+    </div>
   );
 }

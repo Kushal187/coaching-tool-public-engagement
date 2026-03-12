@@ -1,14 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import {
-  CheckCircle2,
-  AlertTriangle,
-  X as XIcon,
   Loader2,
-  BookOpen,
   RefreshCw,
+  MessageSquare,
+  ChevronDown,
 } from 'lucide-react';
-import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import {
   CoachingChatPanel,
@@ -16,50 +13,15 @@ import {
   type CardStatus,
 } from './CoachingChatPanel';
 import type { NestaResponses } from './Coach';
-import type { CaseStudy } from '../data/caseStudies';
 
 function getStatusColor(status: CardStatus) {
   switch (status) {
     case 'addressed':
-      return {
-        bg: 'bg-[#097261]/10',
-        border: 'border-[#097261]',
-        text: 'text-[#097261]',
-      };
+      return { text: 'text-[#097261]', label: 'Addressed' };
     case 'partial':
-      return {
-        bg: 'bg-[#FDCE3E]/20',
-        border: 'border-[#D09006]',
-        text: 'text-[#D09006]',
-      };
+      return { text: 'text-[#D09006]', label: 'Partial' };
     case 'not-addressed':
-      return {
-        bg: 'bg-[#9D0C1B]/10',
-        border: 'border-[#9D0C1B]',
-        text: 'text-[#9D0C1B]',
-      };
-  }
-}
-
-function getStatusIcon(status: CardStatus) {
-  switch (status) {
-    case 'addressed':
-      return <CheckCircle2 className="w-8 h-8 text-[#097261]" />;
-    case 'partial':
-      return <AlertTriangle className="w-8 h-8 text-[#D09006]" />;
-    case 'not-addressed':
-      return <XIcon className="w-8 h-8 text-[#9D0C1B]" strokeWidth={3} />;
-  }
-}
-
-function getStatusLabel(status: CardStatus) {
-  switch (status) {
-    case 'addressed':
-      return 'Addressed';
-    case 'partial':
-      return 'Partial';
-    case 'not-addressed':
-      return 'Not Addressed';
+      return { text: 'text-[#6B7280]', label: 'Not Addressed' };
   }
 }
 
@@ -68,12 +30,9 @@ export function AssessmentDashboard() {
   const [cards, setCards] = useState<AssessmentCard[]>([]);
   const [responses, setResponses] = useState<NestaResponses>({});
   const [selectedCard, setSelectedCard] = useState<AssessmentCard | null>(null);
+  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [caseStudies, setCaseStudies] = useState<
-    { study: CaseStudy; score: number; reason?: string }[]
-  >([]);
-  const [scoringLoading, setScoringLoading] = useState(false);
 
   useEffect(() => {
     const savedResponses = sessionStorage.getItem('nestaResponses');
@@ -135,71 +94,6 @@ export function AssessmentDashboard() {
     }
   };
 
-  const fetchCaseStudySuggestions = useCallback(async () => {
-    setScoringLoading(true);
-    try {
-      const allRes = await fetch('/api/case-studies');
-      if (!allRes.ok) throw new Error('Failed to fetch case studies');
-      const allStudies: CaseStudy[] = await allRes.json();
-      if (allStudies.length === 0) {
-        setScoringLoading(false);
-        return;
-      }
-
-      const contextSummary = Object.entries(responses)
-        .map(([id, answer]) => `Q${id}: ${answer}`)
-        .join('\n');
-
-      const userContext = {
-        issueArea: responses[1] || '',
-        primaryGoal: responses[1] || '',
-        audience: [responses[2] || ''],
-        timeline: '',
-        resources: [responses[5] || ''],
-        biggestConstraint: '',
-        aiComfort: '',
-        successLooksLike: responses[8] || '',
-        stuckPoint: '',
-        processStage: '',
-      };
-
-      const scoreRes = await fetch('/api/score-case-studies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userContext,
-          plan: contextSummary,
-          caseStudies: allStudies,
-        }),
-      });
-
-      if (!scoreRes.ok) throw new Error('Scoring failed');
-
-      const { scores } = await scoreRes.json();
-      const studyMap = new Map(allStudies.map((s) => [s.id, s]));
-      const ranked = (scores || [])
-        .filter((s: { id: string }) => studyMap.has(s.id))
-        .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
-        .slice(0, 5)
-        .map((s: { id: string; score: number; reason?: string }) => ({
-          study: studyMap.get(s.id)!,
-          score: s.score,
-          reason: s.reason,
-        }));
-      setCaseStudies(ranked);
-    } catch (err) {
-      console.error('Case study scoring failed:', err);
-    } finally {
-      setScoringLoading(false);
-    }
-  }, [responses]);
-
-  useEffect(() => {
-    if (cards.length > 0 && Object.keys(responses).length > 0) {
-      fetchCaseStudySuggestions();
-    }
-  }, [cards.length, responses, fetchCaseStudySuggestions]);
-
   const handleCardClick = (card: AssessmentCard) => {
     setSelectedCard(card);
   };
@@ -251,179 +145,156 @@ export function AssessmentDashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      <div className="mb-8">
-        <h1
-          className="text-3xl text-[#124D8F] mb-2"
-          style={{ fontFamily: "'DM Serif Display', serif" }}
-        >
-          Assessment Dashboard
-        </h1>
-        <p className="text-gray-600 text-lg">
-          Review your assessment results and click any card to open a coaching
-          conversation. Yellow and red cards need attention; green cards can be
-          revisited or marked unresolved.
-        </p>
-        <p className="mt-2 text-gray-500">
-          Progress: {addressedCount}/9 addressed
-        </p>
-      </div>
+    <div className="flex h-[calc(100vh-64px)]">
+      {/* Left panel — accordion sidebar */}
+      <div className="w-[420px] min-w-[360px] border-r border-gray-200 flex flex-col overflow-hidden bg-gray-50/50">
+        <div className="p-6 flex-shrink-0">
+          <h1
+            className="text-2xl text-[#124D8F] mb-2"
+            style={{ fontFamily: "'DM Serif Display', serif" }}
+          >
+            Assessment Dashboard
+          </h1>
+          <p className="text-gray-600 text-sm leading-relaxed">
+            Select a question to start a coaching conversation. Colour indicates status.
+          </p>
+          <p className="mt-2 text-gray-500 text-sm">
+            Progress: {addressedCount}/9 addressed
+          </p>
 
-      {/* Progress bar */}
-      <div className="mb-8">
-        <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-[#097261] rounded-full transition-all duration-500"
-            style={{ width: `${(addressedCount / 9) * 100}%` }}
-          />
+          {/* Progress bar */}
+          <div className="mt-3">
+            <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#097261] rounded-full transition-all duration-500"
+                style={{ width: `${(addressedCount / 9) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Accordion question list */}
+        <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-3">
+          {cards.map((card) => {
+            const status = getStatusColor(card.status);
+            const isSelected = selectedCard?.questionId === card.questionId;
+            const isExpanded = expandedCards.has(card.questionId);
+
+            return (
+              <div
+                key={card.questionId}
+                className={`rounded-xl border transition-all ${
+                  isSelected
+                    ? 'border-[#124D8F] bg-white shadow-md ring-1 ring-[#124D8F]/20'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                }`}
+              >
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleCardClick(card)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleCardClick(card);
+                    }
+                  }}
+                  className="w-full text-left p-4 cursor-pointer"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-xs font-semibold ${status.text}`}>
+                        {status.label}
+                      </span>
+                      <p className="mt-1.5 text-sm font-semibold text-gray-800 leading-snug">
+                        {card.questionId}. {card.question}
+                      </p>
+                    </div>
+                    {card.gap && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedCards((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(card.questionId)) {
+                              next.delete(card.questionId);
+                            } else {
+                              next.add(card.questionId);
+                            }
+                            return next;
+                          });
+                        }}
+                        className="mt-1 p-1 rounded-md hover:bg-gray-100 transition-colors flex-shrink-0 cursor-pointer"
+                      >
+                        <ChevronDown
+                          className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
+                            isExpanded ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {isExpanded && card.gap && (
+                  <div className="px-4 pb-4 -mt-1">
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      {card.gap}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Generate Reflection */}
+        <div className="p-6 border-t border-gray-200 flex-shrink-0 bg-gray-50/80">
+          <Button
+            onClick={() => {
+              sessionStorage.setItem('nestaEvaluations', JSON.stringify(cards));
+              navigate('/coach/reflection');
+            }}
+            disabled={!canGenerateReflection}
+            className="w-full py-2.5 text-sm"
+          >
+            Generate Reflection
+            {!canGenerateReflection && ` (${7 - addressedCount} more needed)`}
+          </Button>
+          {!canGenerateReflection && (
+            <p className="mt-2 text-xs text-gray-400 text-center">
+              Address at least 7 of 9 questions to generate your reflection
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Cards grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-        {cards.map((card) => {
-          const colors = getStatusColor(card.status);
-
-          return (
-            <div
-              key={card.questionId}
-              onClick={() => handleCardClick(card)}
-              className={`${colors.bg} border-2 ${colors.border} rounded-xl p-6 transition-all cursor-pointer hover:shadow-lg hover:scale-[1.02]`}
+      {/* Right panel — chat */}
+      <div className="flex-1 min-w-0">
+        {selectedCard ? (
+          <CoachingChatPanel
+            card={selectedCard}
+            allCards={cards}
+            userResponse={responses[selectedCard.questionId] || ''}
+            onStatusChange={handleStatusChange}
+          />
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-gray-400 px-8">
+            <MessageSquare className="w-16 h-16 mb-4 text-gray-300" />
+            <h2
+              className="text-xl text-gray-500 mb-2"
+              style={{ fontFamily: "'DM Serif Display', serif" }}
             >
-              <div className="flex justify-between items-start mb-4">
-                {getStatusIcon(card.status)}
-                <span
-                  className={`text-sm px-3 py-1 rounded-full ${colors.text} bg-white/50 font-semibold`}
-                >
-                  {getStatusLabel(card.status)}
-                </span>
-              </div>
-              <h3 className="text-base font-semibold text-gray-800 mb-3">
-                {card.questionId}. {card.question}
-              </h3>
-              {card.gap && (
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  {card.gap}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Suggested Case Studies */}
-      <div className="mb-12">
-        <h2
-          className="text-2xl text-[#124D8F] mb-1"
-          style={{ fontFamily: "'DM Serif Display', serif" }}
-        >
-          Suggested Case Studies
-        </h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Based on your assessment, these case studies may be helpful
-        </p>
-
-        {scoringLoading && (
-          <div className="flex flex-col items-center justify-center py-10 space-y-3">
-            <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
-            <p className="text-sm text-gray-500">
-              Finding relevant case studies...
+              Select a question to begin
+            </h2>
+            <p className="text-sm text-center max-w-md leading-relaxed">
+              Choose a question from the panel on the left to open a coaching
+              conversation. Your chat history for each question is saved
+              automatically.
             </p>
           </div>
         )}
-
-        {!scoringLoading && caseStudies.length > 0 && (
-          <div className="space-y-3">
-            {caseStudies.map(({ study, score, reason }, idx) => (
-              <Link
-                key={study.id}
-                to={`/case-studies/${study.id}`}
-                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-400 hover:shadow-sm transition-all group"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#E4EFFC] text-[#124D8F] text-sm font-semibold flex-shrink-0">
-                    {idx + 1}
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-[#124D8F] group-hover:underline">
-                      {study.title}
-                    </h4>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                      <span>{study.location}</span>
-                      <span>&bull;</span>
-                      <span>{study.timeframe}</span>
-                      <span>&bull;</span>
-                      <span className="capitalize">{study.scale} scale</span>
-                    </div>
-                    {reason && (
-                      <p className="text-xs text-gray-500 mt-1.5 italic">
-                        {reason}
-                      </p>
-                    )}
-                    <div className="flex gap-1.5 mt-2">
-                      {study.tags.map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="text-xs"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <div className="text-right">
-                    <div className="text-xs text-gray-500">Relevance</div>
-                    <div className="text-sm font-semibold text-gray-900">
-                      {Math.min(Math.round(score), 99)}%
-                    </div>
-                  </div>
-                  <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-[#124D8F] transition-colors" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-
-        {!scoringLoading && caseStudies.length === 0 && (
-          <p className="text-sm text-gray-400 italic py-4">
-            No case studies available for scoring.
-          </p>
-        )}
       </div>
-
-      {/* Generate Reflection */}
-      <div className="text-center pb-8">
-        <Button
-          onClick={() => {
-            sessionStorage.setItem('nestaEvaluations', JSON.stringify(cards));
-            navigate('/coach/reflection');
-          }}
-          disabled={!canGenerateReflection}
-          className="px-10 py-3 text-base"
-        >
-          Generate Reflection
-          {!canGenerateReflection && ` (${7 - addressedCount} more needed)`}
-        </Button>
-        {!canGenerateReflection && (
-          <p className="mt-3 text-sm text-gray-400">
-            Address at least 7 of 9 questions to generate your reflection
-          </p>
-        )}
-      </div>
-
-      {/* Coaching chat panel */}
-      {selectedCard && (
-        <CoachingChatPanel
-          card={selectedCard}
-          allCards={cards}
-          userResponse={responses[selectedCard.questionId] || ''}
-          onClose={() => setSelectedCard(null)}
-          onStatusChange={handleStatusChange}
-        />
-      )}
     </div>
   );
 }

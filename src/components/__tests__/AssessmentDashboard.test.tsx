@@ -17,10 +17,9 @@ vi.mock('../ui/markdown-content', () => ({
 }));
 
 vi.mock('../CoachingChatPanel', () => ({
-  CoachingChatPanel: ({ card, onClose }: { card: { questionId: number }; onClose: () => void }) => (
+  CoachingChatPanel: ({ card }: { card: { questionId: number } }) => (
     <div data-testid="coaching-panel">
       <span>Coaching Q{card.questionId}</span>
-      <button onClick={onClose}>Close Panel</button>
     </div>
   ),
 }));
@@ -63,9 +62,6 @@ describe('AssessmentDashboard', () => {
   it('renders dashboard from sessionStorage evaluations', async () => {
     sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
     sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: false, status: 404 });
 
     renderDashboard();
 
@@ -75,12 +71,9 @@ describe('AssessmentDashboard', () => {
     expect(screen.getByText(/7\/9 addressed/)).toBeInTheDocument();
   });
 
-  it('shows all status labels on cards', async () => {
+  it('shows all status labels on accordion items', async () => {
     sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
     sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: false, status: 404 });
 
     renderDashboard();
 
@@ -94,27 +87,22 @@ describe('AssessmentDashboard', () => {
     expect(screen.getByText('Not Addressed')).toBeInTheDocument();
   });
 
-  it('displays gap text on cards that have gaps', async () => {
+  it('shows placeholder when no question is selected', async () => {
     sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
     sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: false, status: 404 });
 
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getByText('Needs more detail on channels')).toBeInTheDocument();
+      expect(screen.getByText('Assessment Dashboard')).toBeInTheDocument();
     });
-    expect(screen.getByText('No evaluation plan described')).toBeInTheDocument();
+
+    expect(screen.getByText('Select a question to begin')).toBeInTheDocument();
   });
 
   it('enables Generate Reflection when 7+ cards are addressed', async () => {
     sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
     sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: false, status: 404 });
 
     renderDashboard();
 
@@ -132,9 +120,6 @@ describe('AssessmentDashboard', () => {
     );
     sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
     sessionStorage.setItem('nestaEvaluations', JSON.stringify(fewAddressed));
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: false, status: 404 });
 
     renderDashboard();
 
@@ -147,13 +132,10 @@ describe('AssessmentDashboard', () => {
     expect(screen.getByText(/Address at least 7 of 9/)).toBeInTheDocument();
   });
 
-  it('opens coaching panel when a card is clicked', async () => {
+  it('opens coaching panel when a question is clicked', async () => {
     const user = userEvent.setup();
     sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
     sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: false, status: 404 });
 
     renderDashboard();
 
@@ -167,27 +149,6 @@ describe('AssessmentDashboard', () => {
     expect(screen.getByText('Coaching Q3')).toBeInTheDocument();
   });
 
-  it('closes coaching panel when close is clicked', async () => {
-    const user = userEvent.setup();
-    sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
-    sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: false, status: 404 });
-
-    renderDashboard();
-
-    await waitFor(() => {
-      expect(screen.getByText('Assessment Dashboard')).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByText('3. Can you reach participants?'));
-    expect(screen.getByTestId('coaching-panel')).toBeInTheDocument();
-
-    await user.click(screen.getByText('Close Panel'));
-    expect(screen.queryByTestId('coaching-panel')).not.toBeInTheDocument();
-  });
-
   it('fetches evaluations from API when not in sessionStorage', async () => {
     sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
 
@@ -197,9 +158,6 @@ describe('AssessmentDashboard', () => {
           ok: true,
           json: () => Promise.resolve({ evaluations: MOCK_EVALUATIONS }),
         });
-      }
-      if (url === '/api/case-studies') {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
       }
       return Promise.resolve({ ok: false, status: 404 });
     });
@@ -230,19 +188,5 @@ describe('AssessmentDashboard', () => {
       expect(screen.getByText(/Failed to load your assessment/)).toBeInTheDocument();
     });
     expect(screen.getByRole('button', { name: /Try Again/i })).toBeInTheDocument();
-  });
-
-  it('shows case study suggestions section', async () => {
-    sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
-    sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: false, status: 404 });
-
-    renderDashboard();
-
-    await waitFor(() => {
-      expect(screen.getByText('Suggested Case Studies')).toBeInTheDocument();
-    });
   });
 });
