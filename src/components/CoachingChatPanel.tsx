@@ -250,25 +250,23 @@ export function CoachingChatPanel({
 
   return (
     <div className="h-full bg-white flex flex-col">
-      {/* Header */}
-      <div className="bg-[#124D8F] text-white p-5 flex-shrink-0">
-        <h2
-          className="text-lg mb-1"
-          style={{ fontFamily: "'DM Serif Display', serif" }}
-        >
-          Coaching Chat
-        </h2>
-        <p className="text-sm opacity-90">{card.question}</p>
-      </div>
-
-      {/* Status toggle */}
-      <div className="px-5 pt-3 pb-2 border-b flex-shrink-0">
+      {/* Header with status toggle */}
+      <div className="bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between flex-shrink-0">
+        <div className="min-w-0 flex-1 mr-4">
+          <h2
+            className="text-lg text-[#124D8F]"
+            style={{ fontFamily: "'DM Serif Display', serif" }}
+          >
+            Coaching Chat
+          </h2>
+          <p className="text-sm text-gray-500 mt-0.5 truncate">{card.question}</p>
+        </div>
         <button
           type="button"
           onClick={handleToggleStatus}
-          className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg transition-colors cursor-pointer font-semibold text-sm ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors cursor-pointer font-semibold text-sm flex-shrink-0 ${
             isResolved
-              ? 'bg-amber-50 text-[#D09006] border-2 border-[#D09006] hover:bg-amber-100'
+              ? 'bg-amber-50 text-[#D09006] border border-[#D09006] hover:bg-amber-100'
               : 'bg-[#097261] text-white hover:bg-[#097261]/90'
           }`}
         >
@@ -284,11 +282,6 @@ export function CoachingChatPanel({
             </>
           )}
         </button>
-        {isResolved && (
-          <p className="text-xs text-gray-400 text-center mt-1.5">
-            You can continue chatting
-          </p>
-        )}
       </div>
 
       {/* Messages */}

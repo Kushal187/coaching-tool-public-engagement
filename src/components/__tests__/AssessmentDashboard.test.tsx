@@ -142,7 +142,7 @@ describe('AssessmentDashboard', () => {
       expect(screen.getByText('Assessment Dashboard')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('3. Can you reach participants?'));
+    await user.click(screen.getByText('Can you reach participants?'));
 
     expect(screen.getByTestId('coaching-panel')).toBeInTheDocument();
     expect(screen.getByText('Coaching Q3')).toBeInTheDocument();

@@ -129,7 +129,7 @@ export function Layout() {
         </div>
       </footer>
 
-      <ChatBot />
+      {!location.pathname.startsWith('/coach/dashboard') && <ChatBot />}
     </div>
   );
 }

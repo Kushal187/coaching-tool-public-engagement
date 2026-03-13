@@ -227,9 +227,9 @@ export function AssessmentDashboard() {
                             : 'hover:bg-gray-50'
                         }`}
                       >
-                        <p className="text-sm font-semibold text-gray-800 leading-snug">
-                          {card.questionId}. {card.question}
-                        </p>
+                          <p className="text-sm font-semibold text-gray-800 leading-snug">
+                            {card.question}
+                          </p>
                       </button>
                     );
                   })}
