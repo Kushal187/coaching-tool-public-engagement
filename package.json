@@ -12,6 +12,7 @@
     "start": "node server.mjs",
     "build": "vite build",
     "test": "vitest run",
+    "test:scenarios": "node scripts/test-scenario-responses.mjs",
     "test:watch": "vitest",
     "preview": "npm run build && node server.mjs",
     "convert": "python scripts/convert-pdfs.py",
