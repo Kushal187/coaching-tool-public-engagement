@@ -162,8 +162,8 @@ export function CoachingChatPanel({
 
       if (botContent) {
         const updatedMessages: Message[] = [...newMessages, { role: 'ai', content: botContent }];
-        setMessages(updatedMessages);
-        analyzeCrossResolution(updatedMessages);
+        setMessages(() => updatedMessages);
+        await analyzeCrossResolution(updatedMessages);
       }
     } catch (err) {
       console.error('Coaching chat error:', err);
@@ -180,11 +180,12 @@ export function CoachingChatPanel({
   };
 
   const analyzeCrossResolution = async (msgs: Message[]) => {
+    const currentAlreadyResolved = currentStatus === 'addressed';
     const unresolvedCards = allCards
       .filter((c) => c.status !== 'addressed' && c.questionId !== card.questionId)
       .map((c) => ({ questionId: c.questionId, question: c.question, gap: c.gap }));
 
-    if (unresolvedCards.length === 0) return;
+    if (unresolvedCards.length === 0 && currentAlreadyResolved) return;
 
     try {
       const conversationForAnalysis = msgs
@@ -197,40 +198,56 @@ export function CoachingChatPanel({
         body: JSON.stringify({
           conversation: conversationForAnalysis,
           currentQuestionId: card.questionId,
+          currentQuestion: { question: card.question, gap: card.gap },
           unresolvedCards,
         }),
       });
 
       if (!res.ok) return;
 
-      const { resolvedQuestionIds } = await res.json();
-      if (!Array.isArray(resolvedQuestionIds) || resolvedQuestionIds.length === 0) return;
+      const { resolvedQuestionIds, currentQuestionResolved } = await res.json();
 
-      const resolvedNames = resolvedQuestionIds
-        .map((id: number) => {
-          const c = allCards.find((ac) => ac.questionId === id);
-          return c ? `**Q${id}:** ${c.question}` : `Q${id}`;
-        })
-        .join('\n- ');
+      const newMessages: Message[] = [];
 
-      for (const id of resolvedQuestionIds) {
-        onStatusChange(id, 'addressed');
-      }
-
-      try {
-        const prev = JSON.parse(sessionStorage.getItem('nestaCrossResolved') || '[]');
-        const merged = [...new Set([...prev, ...resolvedQuestionIds])];
-        sessionStorage.setItem('nestaCrossResolved', JSON.stringify(merged));
-      } catch { /* ignore */ }
-
-      setMessages((prev) => [
-        ...prev,
-        {
+      if (currentQuestionResolved && !currentAlreadyResolved) {
+        setCurrentStatus('addressed');
+        onStatusChange(card.questionId, 'addressed');
+        newMessages.push({
           role: 'ai',
           content:
-            `Based on our conversation, the following assessment question${resolvedQuestionIds.length > 1 ? 's were' : ' was'} also resolved:\n\n- ${resolvedNames}\n\nYou can revisit ${resolvedQuestionIds.length > 1 ? 'them' : 'it'} from the dashboard if needed.`,
-        },
-      ]);
+            `Based on our conversation, it looks like you've substantively addressed the gap for this question. I've automatically marked it as **resolved**. You can change this from the dashboard if needed.`,
+        });
+      }
+
+      const crossIds = Array.isArray(resolvedQuestionIds) ? resolvedQuestionIds : [];
+      if (crossIds.length > 0) {
+        const resolvedNames = crossIds
+          .map((id: number) => {
+            const c = allCards.find((ac) => ac.questionId === id);
+            return c ? `**Q${id}:** ${c.question}` : `Q${id}`;
+          })
+          .join('\n- ');
+
+        for (const id of crossIds) {
+          onStatusChange(id, 'addressed');
+        }
+
+        try {
+          const prev = JSON.parse(sessionStorage.getItem('nestaCrossResolved') || '[]');
+          const merged = [...new Set([...prev, ...crossIds])];
+          sessionStorage.setItem('nestaCrossResolved', JSON.stringify(merged));
+        } catch { /* ignore */ }
+
+        newMessages.push({
+          role: 'ai',
+          content:
+            `Based on our conversation, the following assessment question${crossIds.length > 1 ? 's were' : ' was'} also resolved:\n\n- ${resolvedNames}\n\nYou can revisit ${crossIds.length > 1 ? 'them' : 'it'} from the dashboard if needed.`,
+        });
+      }
+
+      if (newMessages.length > 0) {
+        setMessages((prev) => [...prev, ...newMessages]);
+      }
     } catch {
       /* cross-resolution is best-effort; don't disrupt the chat */
     }

@@ -481,26 +481,33 @@ app.post('/api/chatbot', async (req, res) => {
 
 // ── POST /api/analyze-cross-resolution ──────────────────────
 
-const CROSS_RESOLUTION_PROMPT = `You are an evaluator that determines whether a coaching conversation has substantively addressed assessment gaps from OTHER Nesta framework questions.
+const CROSS_RESOLUTION_PROMPT = `You are an evaluator that determines whether a coaching conversation has substantively addressed assessment gaps from Nesta framework questions.
 
 You will receive:
 1. A coaching conversation transcript (about a specific Nesta question).
-2. A list of OTHER unresolved assessment cards, each with a question and an identified gap.
+2. The CURRENT question's text and its identified gap.
+3. Optionally, a list of OTHER unresolved assessment cards, each with a question and an identified gap.
 
-For each unresolved card, decide whether the conversation has **directly and substantively** addressed that card's specific gap. Be CONSERVATIVE:
+Your job is twofold:
+A) Decide whether the conversation has **directly and substantively** resolved the CURRENT question's gap.
+B) For each OTHER unresolved card (if any), decide whether the conversation has **directly and substantively** addressed that card's specific gap.
+
+Be CONSERVATIVE for both:
 - The conversation must contain a concrete, actionable discussion that closes the gap — not just a passing mention.
 - If the gap says the user hasn't identified participants, the conversation must show the user articulating who their participants are.
 - Tangential references or vague overlap do NOT count.
 
-Return ONLY a JSON object: { "resolvedQuestionIds": [<numbers>] }
-If no other cards are resolved, return: { "resolvedQuestionIds": [] }
-Do NOT include the current question's ID. Return raw JSON with no markdown fences.`;
+Return ONLY a JSON object: { "currentQuestionResolved": true/false, "resolvedQuestionIds": [<numbers>] }
+- "currentQuestionResolved" should be true only if the current question's gap has been substantively addressed.
+- "resolvedQuestionIds" should contain IDs of OTHER cards resolved (not the current question's ID).
+- If nothing is resolved, return: { "currentQuestionResolved": false, "resolvedQuestionIds": [] }
+Return raw JSON with no markdown fences.`;
 
 app.post('/api/analyze-cross-resolution', async (req, res) => {
-  const { conversation, currentQuestionId, unresolvedCards } = req.body;
+  const { conversation, currentQuestionId, currentQuestion, unresolvedCards } = req.body;
 
-  if (!Array.isArray(conversation) || !Array.isArray(unresolvedCards) || unresolvedCards.length === 0) {
-    return res.json({ resolvedQuestionIds: [] });
+  if (!Array.isArray(conversation) || !currentQuestion) {
+    return res.json({ resolvedQuestionIds: [], currentQuestionResolved: false });
   }
 
   try {
@@ -508,21 +515,31 @@ app.post('/api/analyze-cross-resolution', async (req, res) => {
       .map((m) => `${m.role === 'user' ? 'PRACTITIONER' : 'COACH'}: ${m.content}`)
       .join('\n\n');
 
-    const cardsList = unresolvedCards
-      .map((c) => `- Question ${c.questionId}: "${c.question}" | Gap: "${c.gap}"`)
-      .join('\n');
-
-    const userMessage = [
+    const messageParts = [
       `## Current Coaching Conversation (Question ${currentQuestionId})`,
       '',
       transcript,
       '',
-      '## Other Unresolved Assessment Cards',
+      `## Current Question`,
+      `- Question ${currentQuestionId}: "${currentQuestion.question}" | Gap: "${currentQuestion.gap}"`,
       '',
-      cardsList,
-      '',
-      'Which of these other cards (if any) has the conversation substantively resolved? Return JSON.',
-    ].join('\n');
+    ];
+
+    const hasOtherCards = Array.isArray(unresolvedCards) && unresolvedCards.length > 0;
+    if (hasOtherCards) {
+      const cardsList = unresolvedCards
+        .map((c) => `- Question ${c.questionId}: "${c.question}" | Gap: "${c.gap}"`)
+        .join('\n');
+      messageParts.push('## Other Unresolved Assessment Cards', '', cardsList, '');
+    }
+
+    messageParts.push(
+      'Has the conversation substantively resolved the current question\'s gap? ' +
+      (hasOtherCards ? 'Which of the other cards (if any) has it also resolved? ' : '') +
+      'Return JSON.',
+    );
+
+    const userMessage = messageParts.join('\n');
 
     const response = await openaiClient.chat.completions.create({
       model: MODEL,
@@ -536,15 +553,17 @@ app.post('/api/analyze-cross-resolution', async (req, res) => {
     const text = (response.choices[0]?.message?.content || '').trim();
     const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     const parsed = JSON.parse(cleaned);
+
+    const currentResolved = parsed.currentQuestionResolved === true;
     const ids = (parsed.resolvedQuestionIds || []).filter(
       (id) => typeof id === 'number' && id !== currentQuestionId,
     );
 
-    console.log(`[cross-resolution] Q${currentQuestionId} → resolved others: [${ids.join(', ')}]`);
-    return res.json({ resolvedQuestionIds: ids });
+    console.log(`[cross-resolution] Q${currentQuestionId} → self-resolved: ${currentResolved}, resolved others: [${ids.join(', ')}]`);
+    return res.json({ resolvedQuestionIds: ids, currentQuestionResolved: currentResolved });
   } catch (err) {
     console.error('[cross-resolution] Analysis failed:', err.message);
-    return res.json({ resolvedQuestionIds: [] });
+    return res.json({ resolvedQuestionIds: [], currentQuestionResolved: false });
   }
 });
 
