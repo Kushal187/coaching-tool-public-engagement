@@ -134,7 +134,7 @@ export function Reflection() {
         doc.setFontSize(8);
         doc.setTextColor(100, 100, 100);
         doc.text(
-          'Public Engagement Coach \u2014 Nesta Framework Assessment',
+          'Public Engagement Coach -- Nesta Framework Assessment',
           pageWidth / 2,
           pageHeight - 10,
           { align: 'center' },
@@ -153,6 +153,22 @@ export function Reflection() {
         .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
         .replace(/^\s*[-*]\s/gm, '\u2022 ');
 
+    // Normalize Unicode for jsPDF - prevents spaces-between-letters rendering bug.
+    // jsPDF's default font only supports ASCII; any other Unicode causes character spacing corruption.
+    const normalizeForPdf = (text: string): string => {
+      let out = text
+        .replace(/\u00A0/g, ' ') // Non-breaking space
+        .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+        .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+        .replace(/[\u2013\u2014\u2212]/g, '-')
+        .replace(/\u26A0\s*/g, '')
+        .replace(/\u2022/g, '-')
+        .replace(/\u2026/g, '...')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, ''); // Remove combining diacritics (e.g. e + accent -> e)
+      return out.replace(/[^\x20-\x7E\n\r\t]/g, ''); // Strip any remaining non-ASCII
+    };
+
     const writeWrapped = (
       text: string,
       fontSize: number,
@@ -160,13 +176,13 @@ export function Reflection() {
       style: 'normal' | 'bold' = 'normal',
       indent = 0,
     ) => {
-      doc.setFontSize(fontSize);
-      doc.setTextColor(...color);
-      doc.setFont('helvetica', style);
-      const cleaned = stripMarkdown(text);
+      const cleaned = normalizeForPdf(stripMarkdown(text));
       const wrapped = doc.splitTextToSize(cleaned, contentWidth - indent);
       for (const line of wrapped) {
         checkPage(fontSize * 0.5);
+        doc.setFontSize(fontSize);
+        doc.setTextColor(...color);
+        doc.setFont('helvetica', style);
         doc.text(line, margin + indent, y);
         y += fontSize * 0.45;
       }
@@ -195,7 +211,7 @@ export function Reflection() {
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
     doc.text(
-      'Public Engagement Coach \u2014 Nesta Framework Assessment',
+      'Public Engagement Coach -- Nesta Framework Assessment',
       pageWidth / 2,
       pageHeight - 10,
       { align: 'center' },
@@ -204,7 +220,7 @@ export function Reflection() {
     // ── Overall Summary ──
     doc.addPage();
     y = margin;
-    doc.setFontSize(18);
+    doc.setFontSize(16);
     doc.setTextColor(18, 77, 143);
     doc.setFont('helvetica', 'bold');
     doc.text('Overall Summary', margin, y);
@@ -228,7 +244,7 @@ export function Reflection() {
       doc.setFontSize(16);
       doc.setTextColor(...color);
       doc.setFont('helvetica', 'bold');
-      doc.text(title, margin, y);
+      doc.text(normalizeForPdf(title), margin, y);
       y += 3;
       doc.setDrawColor(...color);
       doc.setLineWidth(0.5);
@@ -238,35 +254,14 @@ export function Reflection() {
       items.forEach((item, i) => {
         checkPage(14);
         if (highlightNoChat && resolvedWithoutChat.has(item.questionId)) {
-          checkPage(10);
-          doc.setFillColor(255, 243, 205);
-          doc.setDrawColor(217, 164, 6);
-          doc.roundedRect(margin, y - 3, contentWidth, 8, 1.5, 1.5, 'FD');
-          doc.setFontSize(9);
-          doc.setTextColor(146, 100, 0);
-          doc.setFont('helvetica', 'bold');
-          doc.text('\u26A0  Resolved without coaching conversation', margin + 3, y + 2);
-          y += 9;
+          writeWrapped('Resolved without coaching conversation', 9, [80, 80, 80], 'normal');
+          y += 2;
         } else if (highlightNoChat && resolvedViaCrossChat.has(item.questionId)) {
-          checkPage(10);
-          doc.setFillColor(228, 239, 252);
-          doc.setDrawColor(18, 77, 143);
-          doc.roundedRect(margin, y - 3, contentWidth, 8, 1.5, 1.5, 'FD');
-          doc.setFontSize(9);
-          doc.setTextColor(18, 77, 143);
-          doc.setFont('helvetica', 'bold');
-          doc.text('Resolved through a different conversation', margin + 3, y + 2);
-          y += 9;
+          writeWrapped('Resolved through a different conversation', 9, [80, 80, 80], 'normal');
+          y += 2;
         } else if (highlightNoChat && resolvedInAssessment.has(item.questionId)) {
-          checkPage(10);
-          doc.setFillColor(230, 245, 241);
-          doc.setDrawColor(9, 114, 97);
-          doc.roundedRect(margin, y - 3, contentWidth, 8, 1.5, 1.5, 'FD');
-          doc.setFontSize(9);
-          doc.setTextColor(9, 114, 97);
-          doc.setFont('helvetica', 'bold');
-          doc.text('Resolved in the Coaching Assessment', margin + 3, y + 2);
-          y += 9;
+          writeWrapped('Resolved in the Coaching Assessment', 9, [80, 80, 80], 'normal');
+          y += 2;
         }
         writeWrapped(
           `${i + 1}. ${item.question}`,
@@ -289,20 +284,20 @@ export function Reflection() {
     };
 
     renderSection(
-      'Strengths \u2014 What You\'ve Figured Out',
+      'Strengths -- What You\'ve Figured Out',
       reflection.addressed,
       [9, 114, 97],
       false,
       true,
     );
     renderSection(
-      'Areas to Develop \u2014 What\'s Underdeveloped',
+      'Areas to Develop -- What\'s Underdeveloped',
       reflection.partial,
       [208, 144, 6],
       true,
     );
     renderSection(
-      'Critical Gaps \u2014 What to Work On Next',
+      'Critical Gaps -- What to Work On Next',
       reflection.notAddressed,
       [157, 12, 27],
       true,
@@ -336,7 +331,7 @@ export function Reflection() {
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
     doc.text(
-      'Public Engagement Coach \u2014 Nesta Framework Assessment',
+      'Public Engagement Coach -- Nesta Framework Assessment',
       pageWidth / 2,
       pageHeight - 10,
       { align: 'center' },
