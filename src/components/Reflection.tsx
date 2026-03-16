@@ -1,16 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import {
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
   Download,
   ChevronLeft,
   Loader2,
-  Target,
   RefreshCw,
-  MessageSquare,
-  ClipboardCheck,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { Button } from './ui/button';
@@ -415,20 +409,17 @@ export function Reflection() {
       <div className="space-y-6 mb-8">
         {/* Strengths */}
         {reflection.addressed.length > 0 && (
-          <div className="bg-[#097261]/10 border-2 border-[#097261] rounded-xl p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <CheckCircle2 className="w-10 h-10 text-[#097261] flex-shrink-0" />
-              <div>
-                <h2
-                  className="text-2xl text-[#097261]"
-                  style={{ fontFamily: "'DM Serif Display', serif" }}
-                >
-                  Strengths
-                </h2>
-                <p className="text-[#097261]/70 text-sm">
-                  What you've figured out and why it matters
-                </p>
-              </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-8">
+            <div className="mb-6">
+              <h2
+                className="text-2xl text-[#097261]"
+                style={{ fontFamily: "'DM Serif Display', serif" }}
+              >
+                Strengths
+              </h2>
+              <p className="text-[#097261]/70 text-sm">
+                What you've figured out and why it matters
+              </p>
             </div>
             <div className="space-y-5">
               {reflection.addressed.map((item) => {
@@ -439,38 +430,30 @@ export function Reflection() {
                 return (
                 <div
                   key={item.questionId}
-                  className={`rounded-lg p-5 ${
-                    isNoChat
-                      ? 'bg-amber-50 border-2 border-amber-400'
-                      : isCrossResolved
-                        ? 'bg-blue-50/60 border border-[#124D8F]/20'
-                        : isFromAssessment
-                          ? 'bg-[#097261]/5 border border-[#097261]/20'
-                          : 'bg-white/60'
-                  }`}
+                  className="rounded-lg p-5 bg-white border border-gray-200"
                 >
                   {isNoChat && (
-                    <div className="flex items-center gap-2 mb-3 bg-amber-100 border border-amber-300 rounded-md px-3 py-2">
-                      <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                      <span className="text-sm font-bold text-amber-800">
-                        Resolved without coaching conversation
-                      </span>
+                    <div
+                      className="mb-3 rounded-r-md border-l-4 border-gray-500 bg-gray-100 px-3 py-2 text-sm font-medium text-gray-800"
+                      role="status"
+                    >
+                      Resolved without coaching conversation
                     </div>
                   )}
                   {isCrossResolved && !isNoChat && (
-                    <div className="flex items-center gap-2 mb-3 bg-[#E4EFFC] border border-[#124D8F]/20 rounded-md px-3 py-2">
-                      <MessageSquare className="w-4 h-4 text-[#124D8F] flex-shrink-0" />
-                      <span className="text-sm font-bold text-[#124D8F]">
-                        Resolved through a different conversation
-                      </span>
+                    <div
+                      className="mb-3 rounded-r-md border-l-4 border-gray-500 bg-gray-100 px-3 py-2 text-sm font-medium text-gray-800"
+                      role="status"
+                    >
+                      Resolved through a different conversation
                     </div>
                   )}
                   {isFromAssessment && (
-                    <div className="flex items-center gap-2 mb-3 bg-[#097261]/10 border border-[#097261]/20 rounded-md px-3 py-2">
-                      <ClipboardCheck className="w-4 h-4 text-[#097261] flex-shrink-0" />
-                      <span className="text-sm font-bold text-[#097261]">
-                        Resolved in the Coaching Assessment
-                      </span>
+                    <div
+                      className="mb-3 rounded-r-md border-l-4 border-gray-500 bg-gray-100 px-3 py-2 text-sm font-medium text-gray-800"
+                      role="status"
+                    >
+                      Resolved in the Coaching Assessment
                     </div>
                   )}
                   <h3 className="font-semibold text-gray-800 mb-2">
@@ -488,26 +471,23 @@ export function Reflection() {
 
         {/* Areas to Develop */}
         {reflection.partial.length > 0 && (
-          <div className="bg-[#FDCE3E]/20 border-2 border-[#D09006] rounded-xl p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <AlertTriangle className="w-10 h-10 text-[#D09006] flex-shrink-0" />
-              <div>
-                <h2
-                  className="text-2xl text-[#D09006]"
-                  style={{ fontFamily: "'DM Serif Display', serif" }}
-                >
-                  Areas to Develop
-                </h2>
-                <p className="text-[#D09006]/70 text-sm">
-                  Good start, but needs more work
-                </p>
-              </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-8">
+            <div className="mb-6">
+              <h2
+                className="text-2xl text-[#D09006]"
+                style={{ fontFamily: "'DM Serif Display', serif" }}
+              >
+                Areas to Develop
+              </h2>
+              <p className="text-[#D09006]/70 text-sm">
+                Good start, but needs more work
+              </p>
             </div>
             <div className="space-y-5">
               {reflection.partial.map((item) => (
                 <div
                   key={item.questionId}
-                  className="bg-white/60 rounded-lg p-5"
+                  className="bg-white border border-gray-200 rounded-lg p-5"
                 >
                   <h3 className="font-semibold text-gray-800 mb-2">
                     {item.questionId}. {item.question}
@@ -516,8 +496,8 @@ export function Reflection() {
                     <MarkdownContent compact>{item.analysis}</MarkdownContent>
                   </div>
                   {item.nextSteps && item.nextSteps.length > 0 && (
-                    <div className="bg-[#D09006]/10 rounded-lg p-3">
-                      <p className="text-xs font-semibold text-[#D09006] uppercase tracking-wider mb-2">
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
                         Next Steps
                       </p>
                       <ul className="space-y-1">
@@ -526,7 +506,7 @@ export function Reflection() {
                             key={i}
                             className="text-sm text-gray-700 flex gap-2"
                           >
-                            <span className="text-[#D09006] flex-shrink-0">
+                            <span className="text-gray-500 flex-shrink-0">
                               &bull;
                             </span>
                             {step}
@@ -543,26 +523,23 @@ export function Reflection() {
 
         {/* Critical Gaps */}
         {reflection.notAddressed.length > 0 && (
-          <div className="bg-[#9D0C1B]/10 border-2 border-[#9D0C1B] rounded-xl p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <XCircle className="w-10 h-10 text-[#9D0C1B] flex-shrink-0" />
-              <div>
-                <h2
-                  className="text-2xl text-[#9D0C1B]"
-                  style={{ fontFamily: "'DM Serif Display', serif" }}
-                >
-                  Critical Gaps
-                </h2>
-                <p className="text-[#9D0C1B]/70 text-sm">
-                  Areas that need immediate attention
-                </p>
-              </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-8">
+            <div className="mb-6">
+              <h2
+                className="text-2xl text-[#9D0C1B]"
+                style={{ fontFamily: "'DM Serif Display', serif" }}
+              >
+                Critical Gaps
+              </h2>
+              <p className="text-[#9D0C1B]/70 text-sm">
+                Areas that need immediate attention
+              </p>
             </div>
             <div className="space-y-5">
               {reflection.notAddressed.map((item) => (
                 <div
                   key={item.questionId}
-                  className="bg-white/60 rounded-lg p-5"
+                  className="bg-white border border-gray-200 rounded-lg p-5"
                 >
                   <h3 className="font-semibold text-gray-800 mb-2">
                     {item.questionId}. {item.question}
@@ -571,8 +548,8 @@ export function Reflection() {
                     <MarkdownContent compact>{item.analysis}</MarkdownContent>
                   </div>
                   {item.nextSteps && item.nextSteps.length > 0 && (
-                    <div className="bg-[#9D0C1B]/10 rounded-lg p-3">
-                      <p className="text-xs font-semibold text-[#9D0C1B] uppercase tracking-wider mb-2">
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
                         Next Steps
                       </p>
                       <ul className="space-y-1">
@@ -581,7 +558,7 @@ export function Reflection() {
                             key={i}
                             className="text-sm text-gray-700 flex gap-2"
                           >
-                            <span className="text-[#9D0C1B] flex-shrink-0">
+                            <span className="text-gray-500 flex-shrink-0">
                               &bull;
                             </span>
                             {step}
@@ -599,20 +576,17 @@ export function Reflection() {
 
       {/* Priority Actions */}
       {reflection.priorityActions.length > 0 && (
-        <div className="bg-white border-2 border-[#124D8F] rounded-xl p-8 mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <Target className="w-10 h-10 text-[#124D8F] flex-shrink-0" />
-            <div>
-              <h2
+        <div className="bg-white border border-gray-200 rounded-xl p-8 mb-8">
+          <div className="mb-6">
+            <h2
                 className="text-2xl text-[#124D8F]"
                 style={{ fontFamily: "'DM Serif Display', serif" }}
               >
                 Priority Actions
               </h2>
-              <p className="text-gray-500 text-sm">
-                Your top next steps, in order of impact
-              </p>
-            </div>
+            <p className="text-gray-500 text-sm">
+              Your top next steps, in order of impact
+            </p>
           </div>
           <div className="space-y-4">
             {reflection.priorityActions.map((pa, i) => (
