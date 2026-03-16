@@ -6,6 +6,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { MarkdownContent } from './ui/markdown-content';
+import coachingTemplate from '../../prompts/coaching-context.txt?raw';
 
 export type CardStatus = 'addressed' | 'partial' | 'not-addressed';
 
@@ -47,23 +48,11 @@ const COACHING_CONTEXT_PREFIX = (
   gap: string,
   status: CardStatus,
 ) =>
-  `[COACHING CONTEXT — Follow these instructions precisely]\n` +
-  `You are a supportive, Socratic public engagement coach. The user completed a Nesta framework self-assessment.\n\n` +
-  `NESTA QUESTION: "${question}"\n` +
-  `USER'S ORIGINAL RESPONSE: "${userResponse}"\n` +
-  `ASSESSMENT STATUS: ${status}\n` +
-  `IDENTIFIED GAP: ${gap || 'None — this was marked as addressed.'}\n\n` +
-  `YOUR COACHING APPROACH:\n` +
-  `- Start by acknowledging what the user has done well in their response.\n` +
-  `- Ask probing questions to help them think deeper — don't lecture.\n` +
-  `- When the user proposes an approach or solution, EVALUATE it:\n` +
-  `  1. Assess whether their proposal adequately addresses the identified gap.\n` +
-  `  2. Reflect on strengths and weaknesses of their proposal.\n` +
-  `  3. Suggest concrete next steps if needed.\n` +
-  `  4. If their proposal is strong, affirm it clearly and tell them they're ready to mark this as resolved.\n` +
-  `- Use evidence from the knowledge base — search before giving recommendations.\n` +
-  `- Keep responses focused and concise. Use markdown formatting.\n` +
-  `- Maintain a warm, collaborative tone throughout.`;
+  coachingTemplate
+    .replace('{{question}}', question)
+    .replace('{{userResponse}}', userResponse)
+    .replace('{{status}}', status)
+    .replace('{{gap}}', gap || 'None — this was marked as addressed.');
 
 export function CoachingChatPanel({
   card,
