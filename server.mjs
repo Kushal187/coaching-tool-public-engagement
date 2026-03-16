@@ -836,10 +836,19 @@ PROCESS:
 3. For each question, assess whether the user's response adequately addresses the question based on best practices.
 
 EVALUATION CRITERIA:
-For each of the 9 questions, assign one of three statuses:
-- "addressed": The response demonstrates clear, specific, and actionable thinking. The user has a solid plan or approach.
-- "partial": The response shows some awareness but lacks specificity, completeness, or actionable detail. Key elements are missing.
-- "not-addressed": The response is vague, off-topic, missing critical elements, or shows the user hasn't thought through this aspect.
+For each of the 9 questions, apply this decision test:
+
+- "addressed": The response names SPECIFIC actions, people, methods, or timelines.
+  A reader could act on this response without asking follow-up questions.
+
+- "not-addressed": The response fails TWO OR MORE of these checks:
+  (a) Does it name a specific method, tool, or approach? (not just "we will engage people")
+  (b) Does it identify specific people, groups, or roles? (not just "stakeholders")
+  (c) Does it describe a concrete step or sequence? (not just "we plan to do outreach")
+  (d) Is it actually answering THIS question? (not a different one)
+
+- "partial": The response fails exactly ONE of the above checks.
+  It shows real thinking but has one clear gap.
 
 For each question, also provide:
 - "gap": A concise description of what's missing or could be improved (empty string if fully addressed).
@@ -850,6 +859,9 @@ RULES:
 - Reference specific parts of the user's response in your evaluation.
 - Ground your evaluation criteria in evidence from the knowledge base where possible.
 - The coaching context should feel like a conversation opener, not a lecture.
+- IMPORTANT: Do NOT default to "partial." If a response is generic enough that
+  you cannot identify a single concrete action, method, or named entity in it,
+  mark it "not-addressed" even if it sounds well-intentioned.
 
 You MUST respond with valid JSON in exactly this format (no markdown, no code fences):
 {
