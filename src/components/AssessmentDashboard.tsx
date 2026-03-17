@@ -106,11 +106,13 @@ export function AssessmentDashboard() {
   };
 
   const handleStatusChange = (questionId: number, newStatus: CardStatus) => {
-    const updated = cards.map((c) =>
-      c.questionId === questionId ? { ...c, status: newStatus } : c,
-    );
-    setCards(updated);
-    sessionStorage.setItem('nestaEvaluations', JSON.stringify(updated));
+    setCards((prev) => {
+      const updated = prev.map((c) =>
+        c.questionId === questionId ? { ...c, status: newStatus } : c,
+      );
+      sessionStorage.setItem('nestaEvaluations', JSON.stringify(updated));
+      return updated;
+    });
     setSelectedCard((prev) =>
       prev && prev.questionId === questionId
         ? { ...prev, status: newStatus }

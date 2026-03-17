@@ -69,16 +69,23 @@ export function CoachingChatPanel({
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevQuestionIdRef = useRef(card.questionId);
 
   useEffect(() => {
+    const questionChanged = prevQuestionIdRef.current !== card.questionId;
+    prevQuestionIdRef.current = card.questionId;
+
     setCurrentStatus(card.status);
-    const saved = loadChatHistory(card.questionId);
-    if (saved && saved.length > 0) {
-      setMessages(saved);
-    } else {
-      setMessages([{ role: 'ai' as const, content: card.coachingContext }]);
+
+    if (questionChanged) {
+      const saved = loadChatHistory(card.questionId);
+      if (saved && saved.length > 0) {
+        setMessages(saved);
+      } else {
+        setMessages([{ role: 'ai' as const, content: card.coachingContext }]);
+      }
+      setInput('');
     }
-    setInput('');
   }, [card.questionId, card.status, card.coachingContext]);
 
   useEffect(() => {
