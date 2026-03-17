@@ -126,7 +126,7 @@ describe('CaseStudies', () => {
     });
   });
 
-  it('shows "Adapt to My Situation" links for each case study', async () => {
+  it('shows "View Details" links for each case study', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(MOCK_CASE_STUDIES),
@@ -135,8 +135,8 @@ describe('CaseStudies', () => {
     renderCaseStudies();
 
     await waitFor(() => {
-      const adaptLinks = screen.getAllByText('Adapt to My Situation');
-      expect(adaptLinks).toHaveLength(2);
+      const detailLinks = screen.getAllByText('View Details');
+      expect(detailLinks).toHaveLength(2);
     });
   });
 

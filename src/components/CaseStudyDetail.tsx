@@ -2,46 +2,24 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router';
 import {
   ArrowLeft,
-  ArrowRight,
   MapPin,
   Clock,
   Users,
   Target,
-  Edit3,
-  Download,
   Loader2,
   ExternalLink,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Progress } from './ui/progress';
 import { MarkdownContent } from './ui/markdown-content';
 import type { CaseStudy } from '../data/caseStudies';
-
-type AdaptStep = 'info' | 'context' | 'constraints' | 'output';
-
-type SourceDoc = {
-  title: string;
-  sourceUrl: string;
-  contentTypeLabel: string | null;
-};
 
 export function CaseStudyDetail() {
   const { caseStudyId } = useParams();
   const [caseStudy, setCaseStudy] = useState<CaseStudy | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-
-  const [adaptStep, setAdaptStep] = useState<AdaptStep>('info');
-  const [adaptContext, setAdaptContext] = useState('');
-  const [adaptConstraints, setAdaptConstraints] = useState('');
-  const [adaptedPlan, setAdaptedPlan] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [editablePlan, setEditablePlan] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [sources, setSources] = useState<SourceDoc[]>([]);
   const [showFullContent, setShowFullContent] = useState(false);
 
   useEffect(() => {
@@ -92,90 +70,6 @@ export function CaseStudyDetail() {
       </div>
     );
   }
-
-  const steps: AdaptStep[] = ['info', 'context', 'constraints', 'output'];
-  const currentIdx = steps.indexOf(adaptStep);
-  const progressPct = Math.round(((currentIdx + 1) / steps.length) * 100);
-
-  const handleGeneratePlan = async () => {
-    setAdaptStep('output');
-    setIsGenerating(true);
-    setAdaptedPlan('');
-    setEditablePlan('');
-    setSources([]);
-
-    try {
-      const res = await fetch('/api/adapt-case-study', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          caseStudy: {
-            title: caseStudy.title,
-            location: caseStudy.location,
-            timeframe: caseStudy.timeframe,
-            size: caseStudy.scale,
-            demographic: caseStudy.demographic,
-            tags: caseStudy.tags,
-            description: caseStudy.summary,
-            keyOutcomes: caseStudy.keyOutcomes,
-            implementationSteps: caseStudy.implementationSteps,
-          },
-          context: adaptContext,
-          constraints: adaptConstraints,
-        }),
-      });
-
-      if (!res.ok) throw new Error('API request failed');
-
-      const text = await res.text();
-      const lines = text.split('\n');
-      let planContent = '';
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') break;
-
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.content) planContent += parsed.content;
-          if (parsed.sources) setSources(parsed.sources);
-        } catch {
-          /* skip malformed */
-        }
-      }
-
-      setAdaptedPlan(planContent);
-      setEditablePlan(planContent);
-    } catch (err) {
-      console.error('Agentic adaptation failed, using fallback:', err);
-      const fallback = generateAdaptedPlanFallback(
-        caseStudy,
-        adaptContext,
-        adaptConstraints,
-      );
-      setAdaptedPlan(fallback);
-      setEditablePlan(fallback);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleDownload = () => {
-    const content = editablePlan || adaptedPlan;
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `adapted-plan-${caseStudy.title
-      .toLowerCase()
-      .replace(/\s+/g, '-')
-      .slice(0, 30)}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
@@ -282,186 +176,6 @@ export function CaseStudyDetail() {
               )}
             </div>
           )}
-
-          <div className="border border-gray-200 rounded-lg bg-white shadow-sm">
-            <div className="p-6 border-b border-gray-200">
-              <h2
-                className="text-xl text-[#124D8F] mb-1"
-                style={{ fontFamily: "'DM Serif Display', serif" }}
-              >
-                Adapt to My Situation
-              </h2>
-              <p className="text-sm text-gray-500 mb-4">
-                Generate a modified plan based on this case study's approach
-              </p>
-              <Progress value={progressPct} />
-            </div>
-
-            <div className="p-6">
-              {adaptStep === 'info' && (
-                <div className="space-y-4">
-                  <p className="text-gray-700">
-                    This tool will ask you a few quick questions about your
-                    situation and generate a modified engagement plan modeled
-                    on the <strong>{caseStudy.title}</strong> approach.
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Our AI will search the knowledge base for relevant evidence
-                    to ground every recommendation in your adapted plan.
-                  </p>
-                  <Button
-                    onClick={() => setAdaptStep('context')}
-                    className="mt-2"
-                  >
-                    Get Started
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-
-              {adaptStep === 'context' && (
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-[#124D8F] mb-1">
-                      Describe your situation
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      What is your engagement about? Who are you trying to
-                      reach?
-                    </p>
-                  </div>
-                  <textarea
-                    className="w-full min-h-[120px] p-4 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent resize-y"
-                    placeholder="e.g., We're a city agency looking to gather community input on a new parks plan targeting underserved neighborhoods..."
-                    value={adaptContext}
-                    onChange={(e) => setAdaptContext(e.target.value)}
-                  />
-                  <div className="flex justify-between">
-                    <button
-                      onClick={() => setAdaptStep('info')}
-                      className="text-gray-600 hover:text-[#124D8F] transition-colors cursor-pointer"
-                    >
-                      Back
-                    </button>
-                    <Button
-                      onClick={() => setAdaptStep('constraints')}
-                      disabled={!adaptContext.trim()}
-                    >
-                      Continue
-                      <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {adaptStep === 'constraints' && (
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-[#124D8F] mb-1">
-                      What are your constraints?
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      Any limitations on budget, time, staff, technology, or
-                      reach?
-                    </p>
-                  </div>
-                  <textarea
-                    className="w-full min-h-[120px] p-4 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent resize-y"
-                    placeholder="e.g., Limited budget of $3,000, 2-month timeline, small team of 2, no existing online platform..."
-                    value={adaptConstraints}
-                    onChange={(e) => setAdaptConstraints(e.target.value)}
-                  />
-                  <div className="flex justify-between">
-                    <button
-                      onClick={() => setAdaptStep('context')}
-                      className="text-gray-600 hover:text-[#124D8F] transition-colors cursor-pointer"
-                    >
-                      Back
-                    </button>
-                    <Button
-                      onClick={handleGeneratePlan}
-                      disabled={!adaptConstraints.trim()}
-                    >
-                      Generate Adapted Plan
-                      <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {adaptStep === 'output' && (
-                <div className="space-y-4">
-                  {isGenerating ? (
-                    <div className="flex flex-col items-center justify-center py-16 space-y-4">
-                      <Loader2 className="w-8 h-8 text-[#124D8F] animate-spin" />
-                      <p className="text-gray-600 font-medium">
-                        Researching and adapting the case study...
-                      </p>
-                      <p className="text-sm text-gray-400">
-                        Our AI is searching the knowledge base for relevant
-                        evidence
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <h3
-                          className="text-lg font-semibold text-[#124D8F]"
-                        >
-                          Your Adapted Plan
-                        </h3>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setIsEditing(!isEditing)}
-                          >
-                            <Edit3 className="w-4 h-4" />
-                            {isEditing ? 'Preview' : 'Edit'}
-                          </Button>
-                          <Button size="sm" onClick={handleDownload}>
-                            <Download className="w-4 h-4" />
-                            Download
-                          </Button>
-                        </div>
-                      </div>
-
-                      {isEditing ? (
-                        <textarea
-                          className="w-full min-h-[350px] p-4 border border-gray-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent resize-y"
-                          value={editablePlan}
-                          onChange={(e) => setEditablePlan(e.target.value)}
-                        />
-                      ) : (
-                        <div className="p-4 bg-[#E4EFFC]/30 rounded-lg border border-[#124D8F]/10">
-                          <MarkdownContent sources={sources}>
-                            {editablePlan || adaptedPlan}
-                          </MarkdownContent>
-                        </div>
-                      )}
-
-                      {sources.length > 0 && (
-                        <SourceList sources={sources} />
-                      )}
-
-                      <p className="text-xs text-gray-500 italic">
-                        This adapted plan is a starting point. Edit it freely to
-                        better match your specific context. For a more
-                        comprehensive plan, try the{' '}
-                        <Link
-                          to="/coach"
-                          className="text-[#124D8F] underline"
-                        >
-                          full coaching flow
-                        </Link>
-                        .
-                      </p>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
         <div className="lg:col-span-1">
@@ -518,110 +232,4 @@ export function CaseStudyDetail() {
       </div>
     </div>
   );
-}
-
-function SourceList({ sources }: { sources: SourceDoc[] }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const uniqueSources = sources.filter(
-    (s, i, arr) => arr.findIndex((d) => d.title === s.title) === i,
-  );
-
-  if (uniqueSources.length === 0) return null;
-
-  return (
-    <div className="border border-[#124D8F]/10 rounded-lg p-4 bg-[#E4EFFC]/30">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-[#124D8F] transition-colors cursor-pointer w-full"
-      >
-        {isExpanded ? (
-          <ChevronUp className="w-4 h-4" />
-        ) : (
-          <ChevronDown className="w-4 h-4" />
-        )}
-        {uniqueSources.length} source
-        {uniqueSources.length !== 1 ? 's' : ''} referenced
-      </button>
-      {isExpanded && (
-        <div className="mt-3 space-y-2">
-          {uniqueSources.map((src, i) => (
-            <div
-              key={i}
-              className="flex items-start gap-2 text-sm text-gray-600"
-            >
-              <span className="text-[#FDCE3E] mt-px flex-shrink-0">&bull;</span>
-              <span>
-                {src.title}
-                {src.contentTypeLabel && (
-                  <span className="text-gray-400">
-                    {' '}
-                    &middot; {src.contentTypeLabel}
-                  </span>
-                )}
-                {src.sourceUrl && (
-                  <a
-                    href={src.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-0.5 text-[#124D8F] hover:text-[#0e3d72] ml-1"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function generateAdaptedPlanFallback(
-  caseStudy: CaseStudy,
-  context: string,
-  constraints: string,
-): string {
-  let plan = '';
-  plan += `## Adapted Plan: Based on ${caseStudy.title}\n\n`;
-  plan += `**Your Context:** ${context}\n`;
-  plan += `**Your Constraints:** ${constraints}\n`;
-  plan += `**Reference Case Study:** ${caseStudy.title} (${caseStudy.location})\n\n`;
-  plan += `### Adapted Approach\n\n`;
-  plan += `Drawing from the ${caseStudy.title} model, here is a plan adapted to your situation:\n\n`;
-
-  plan += `### Phase 1: Setup (Adapted from ${caseStudy.location} approach)\n\n`;
-  caseStudy.implementationSteps.slice(0, 2).forEach((step) => {
-    plan += `- ${step}\n`;
-  });
-  plan += `- Adapt these steps to your specific context: ${context.slice(0, 80)}...\n`;
-
-  plan += `\n### Phase 2: Implementation\n\n`;
-  caseStudy.implementationSteps.slice(2).forEach((step) => {
-    plan += `- ${step}\n`;
-  });
-
-  const constraintsLower = constraints.toLowerCase();
-  if (
-    constraintsLower.includes('budget') ||
-    constraintsLower.includes('limited') ||
-    constraintsLower.includes('resource')
-  ) {
-    plan += `- Focus on low-cost, high-impact activities first\n`;
-    plan += `- Leverage volunteer networks and existing community infrastructure\n`;
-  }
-
-  plan += `\n### Phase 3: Evaluation & Outcomes\n\n`;
-  plan += `Target outcomes modeled on the original case study:\n`;
-  caseStudy.keyOutcomes.forEach((outcome) => {
-    plan += `- ${outcome}\n`;
-  });
-
-  plan += `\n### Key Adaptations for Your Context\n\n`;
-  plan += `- Modified for your constraints: ${constraints}\n`;
-  plan += `- Timeline and scale adjusted based on your situation\n`;
-  plan += `- Core principles preserved from the ${caseStudy.title} model\n`;
-
-  return plan;
 }

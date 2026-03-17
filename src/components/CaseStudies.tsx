@@ -241,8 +241,7 @@ export function CaseStudies() {
         </h1>
         <p className="text-gray-600">
           Explore real-world examples of successful public engagement
-          initiatives. Use "Adapt to My Situation" to generate a plan modeled
-          on any case study.
+          initiatives.
         </p>
       </div>
 
@@ -370,7 +369,7 @@ export function CaseStudies() {
                     to={`/case-studies/${study.id}`}
                     className="flex items-center gap-2 px-4 py-2 bg-[#124D8F] text-white text-sm rounded-md hover:bg-[#0e3d72] transition-colors flex-shrink-0 ml-4"
                   >
-                    Adapt to My Situation
+                    View Details
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>
