@@ -757,99 +757,7 @@ app.post('/api/adapt-case-study', async (req, res) => {
   }
 });
 
-// ── POST /api/score-case-studies ─────────────────────────────
-
-app.post('/api/score-case-studies', async (req, res) => {
-  const { userContext, plan, caseStudies } = req.body;
-
-  if (!userContext || !caseStudies || !Array.isArray(caseStudies)) {
-    return res.status(400).json({ error: 'Missing required fields: userContext, caseStudies.' });
-  }
-
-  const startTime = Date.now();
-  console.log('\n[score-case-studies] ── Request received ──');
-  console.log(`[score-case-studies] Case studies to score: ${caseStudies.length}`);
-
-  try {
-    const contextSummary = [
-      `Issue area: ${resolveOther(userContext.issueArea, userContext.issueAreaOther)}`,
-      `Primary goal: ${resolveOther(userContext.primaryGoal, userContext.primaryGoalOther)}`,
-      `Target audience: ${resolveArrayOther(userContext.audience, userContext.audienceOther)}`,
-      `Timeline: ${userContext.timeline}`,
-      `Resources: ${resolveArrayOther(userContext.resources, userContext.resourcesOther)}`,
-      `Biggest constraint: ${resolveOther(userContext.biggestConstraint, userContext.biggestConstraintOther)}`,
-      `AI comfort: ${userContext.aiComfort}`,
-      `Success criteria: ${resolveOther(userContext.successLooksLike, userContext.successOther)}`,
-      `Stuck point: ${resolveOther(userContext.stuckPoint, userContext.stuckPointOther)}`,
-      `Process stage: ${userContext.processStage}`,
-      userContext.existingWork ? `Existing work: ${userContext.existingWork}` : '',
-    ].filter(Boolean).join('\n');
-
-    console.log(`[score-case-studies] Context:\n${contextSummary}`);
-
-    const caseStudySummaries = caseStudies.map((cs) => (
-      `- ID: ${cs.id} | Title: "${cs.title}" | Location: ${cs.location} | Scale: ${cs.scale} | ` +
-      `Timeframe: ${cs.timeframe} | Demographic: ${cs.demographic} | Tags: ${cs.tags?.join(', ')} | ` +
-      `Summary: ${cs.summary}`
-    )).join('\n');
-
-    const userMessage = [
-      `Score the following case studies for relevance to this practitioner's situation.`,
-      ``,
-      `## Practitioner Context`,
-      contextSummary,
-      plan ? `\n## Generated Plan (excerpt)\n${plan.slice(0, 1500)}` : '',
-      ``,
-      `## Case Studies to Score`,
-      caseStudySummaries,
-    ].join('\n');
-
-    console.log(`[score-case-studies] Calling agent loop (model: ${MODEL}, max iterations: ${MAX_ITERATIONS})...`);
-
-    const result = await runAgentLoop({
-      systemPrompt: SCORE_CASE_STUDIES_PROMPT,
-      userMessage,
-      tools: agentToolDefinitions,
-      toolImpls: agentToolImplementations,
-      model: MODEL,
-      maxIterations: MAX_ITERATIONS,
-      temperature: 0,
-    });
-
-    const agentMs = Date.now() - startTime;
-    console.log(`[score-case-studies] Agent completed in ${agentMs}ms`);
-
-    if (!result) {
-      console.error('[score-case-studies] Agent returned no response');
-      return res.status(500).json({ error: 'Agent returned no response.' });
-    }
-
-    console.log(`[score-case-studies] Raw agent response:\n${result}`);
-
-    const cleaned = result.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-    let scores;
-    try {
-      const parsed = JSON.parse(cleaned);
-      scores = Array.isArray(parsed) ? parsed : parsed.scores || parsed.results || [];
-    } catch {
-      console.error('[score-case-studies] Failed to parse response as JSON:', cleaned);
-      return res.status(500).json({ error: 'Failed to parse scoring response.' });
-    }
-
-    console.log(`[score-case-studies] ── Results (${scores.length} scored) ──`);
-    scores.forEach((s, i) => {
-      console.log(`  ${i + 1}. [${s.score}%] ${s.id} — ${s.reason}`);
-    });
-    console.log(`[score-case-studies] Total time: ${Date.now() - startTime}ms\n`);
-
-    res.json({ scores });
-  } catch (error) {
-    console.error(`[score-case-studies] Error after ${Date.now() - startTime}ms:`, error);
-    res.status(500).json({ error: 'Failed to score case studies.' });
-  }
-});
-
-// ── GET /api/case-studies ───────────────────────────────────
+// ── Case study helpers (shared by score + list endpoints) ────
 
 const CS_COLLECTION = 'CaseStudyLibrary';
 const CS_SUMMARY_FIELDS =
@@ -877,6 +785,184 @@ function mapCaseStudy(hit, includeFull) {
   }
   return mapped;
 }
+
+// ── POST /api/score-case-studies ─────────────────────────────
+// Multi-query nearText retrieval + single LLM batch scoring.
+// Accepts nestaResponses (Record<questionId, answerText>) from the
+// Nesta framework assessment. Builds 4 semantic queries, retrieves
+// candidates from CaseStudyLibrary in parallel, dedupes, then scores
+// all candidates in a single LLM call using the weighted rubric.
+
+const NESTA_QUERY_GROUPS = [
+  { label: 'goals+outcomes',        keys: [1] },
+  { label: 'participants+reach',    keys: [2, 3] },
+  { label: 'tasks+workflow',        keys: [6, 7] },
+  { label: 'ownership+evaluation',  keys: [4, 8, 9] },
+];
+const NEAR_TEXT_LIMIT = 50;
+const MAX_CANDIDATES = 80;
+
+function buildSearchQueries(nestaResponses) {
+  return NESTA_QUERY_GROUPS
+    .map(({ label, keys }) => {
+      const text = keys
+        .map((k) => (nestaResponses[k] || '').trim())
+        .filter(Boolean)
+        .join(' ');
+      return text ? { label, text: text.slice(0, 300) } : null;
+    })
+    .filter(Boolean);
+}
+
+app.post('/api/score-case-studies', async (req, res) => {
+  const { nestaResponses } = req.body;
+
+  if (!nestaResponses || typeof nestaResponses !== 'object') {
+    return res.status(400).json({ error: 'Missing required field: nestaResponses.' });
+  }
+
+  const startTime = Date.now();
+  console.log('\n[score-case-studies] ── Request received ──');
+
+  try {
+    // 1. Build 3-4 queries from Nesta responses
+    const queries = buildSearchQueries(nestaResponses);
+    console.log(`[score-case-studies] Built ${queries.length} queries: ${queries.map((q) => q.label).join(', ')}`);
+
+    if (queries.length === 0) {
+      return res.status(400).json({ error: 'No usable responses to build search queries.' });
+    }
+
+    // 2. Run parallel nearText queries against CaseStudyLibrary
+    const weaviateStart = Date.now();
+    const results = await Promise.all(
+      queries.map((q) =>
+        weaviateClient.graphql
+          .get()
+          .withClassName('CaseStudyLibrary')
+          .withFields(CS_SUMMARY_FIELDS)
+          .withNearText({ concepts: [q.text] })
+          .withLimit(NEAR_TEXT_LIMIT)
+          .do()
+          .then((r) => {
+            const hits = r?.data?.Get?.CaseStudyLibrary ?? [];
+            console.log(`[score-case-studies]   ${q.label}: ${hits.length} hits`);
+            return hits;
+          })
+      ),
+    );
+    console.log(`[score-case-studies] Weaviate queries took ${Date.now() - weaviateStart}ms`);
+
+    // 3. Merge and dedupe by document_id, keep top MAX_CANDIDATES
+    const seen = new Set();
+    const candidates = [];
+    for (const hits of results) {
+      for (const hit of hits) {
+        if (!hit.document_id || seen.has(hit.document_id)) continue;
+        seen.add(hit.document_id);
+        candidates.push(hit);
+        if (candidates.length >= MAX_CANDIDATES) break;
+      }
+      if (candidates.length >= MAX_CANDIDATES) break;
+    }
+    console.log(`[score-case-studies] ${candidates.length} unique candidates after merge/dedupe`);
+
+    // 4. Build the practitioner context from all Nesta answers
+    const QUESTION_LABELS = {
+      1: 'Project goals',
+      2: 'Target participants',
+      3: 'Participant reach',
+      4: 'Process ownership',
+      5: 'Participation incentives',
+      6: 'Defined tasks',
+      7: 'Workflow',
+      8: 'Input evaluation',
+      9: 'Use of outputs',
+    };
+    const contextLines = Object.entries(nestaResponses)
+      .filter(([, v]) => v && v.trim())
+      .map(([k, v]) => `- ${QUESTION_LABELS[k] || `Q${k}`}: ${v.trim()}`)
+      .join('\n');
+
+    const caseStudyList = candidates
+      .map(
+        (cs) =>
+          `- ID: ${cs.document_id} | Title: "${cs.title}" | Location: ${cs.location || 'N/A'} | Scale: ${cs.scale || 'N/A'} | ` +
+          `Timeframe: ${cs.timeframe || 'N/A'} | Demographic: ${cs.demographic || 'N/A'} | Tags: ${(cs.tags || []).join(', ')} | ` +
+          `Summary: ${cs.summary || ''}`,
+      )
+      .join('\n');
+
+    const userMessage = [
+      'Score the following case studies for relevance to this practitioner\'s situation.',
+      '',
+      '## Practitioner Context',
+      contextLines,
+      '',
+      '## Case Studies to Score',
+      caseStudyList,
+    ].join('\n');
+
+    // 5. Single LLM call with rubric — no agent, no tools
+    const llmStart = Date.now();
+    console.log(`[score-case-studies] Calling LLM (model: ${MODEL}) with ${candidates.length} candidates...`);
+
+    const completion = await openaiClient.chat.completions.create({
+      model: MODEL,
+      temperature: 0,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: SCORE_CASE_STUDIES_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
+    });
+
+    const llmMs = Date.now() - llmStart;
+    console.log(`[score-case-studies] LLM completed in ${llmMs}ms`);
+
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) {
+      console.error('[score-case-studies] LLM returned no content');
+      return res.status(500).json({ error: 'LLM returned no response.' });
+    }
+
+    let scores;
+    try {
+      const parsed = JSON.parse(raw);
+      scores = Array.isArray(parsed) ? parsed : parsed.scores || parsed.results || [];
+    } catch {
+      console.error('[score-case-studies] Failed to parse LLM JSON:', raw);
+      return res.status(500).json({ error: 'Failed to parse scoring response.' });
+    }
+
+    // 6. Merge scores with full case study metadata and return top results
+    const scoreMap = new Map(scores.map((s) => [s.id, s]));
+    const scoredCaseStudies = candidates
+      .filter((cs) => scoreMap.has(cs.document_id))
+      .map((cs) => {
+        const s = scoreMap.get(cs.document_id);
+        return {
+          ...mapCaseStudy(cs, false),
+          relevancyScore: s.score,
+          relevancyReason: s.reason,
+        };
+      })
+      .sort((a, b) => b.relevancyScore - a.relevancyScore);
+
+    console.log(`[score-case-studies] ── Results (${scoredCaseStudies.length} scored) ──`);
+    scoredCaseStudies.slice(0, 10).forEach((s, i) => {
+      console.log(`  ${i + 1}. [${s.relevancyScore}] ${s.id} — ${s.relevancyReason}`);
+    });
+    console.log(`[score-case-studies] Total time: ${Date.now() - startTime}ms (Weaviate: ${Date.now() - weaviateStart - llmMs}ms, LLM: ${llmMs}ms)\n`);
+
+    res.json({ scoredCaseStudies });
+  } catch (error) {
+    console.error(`[score-case-studies] Error after ${Date.now() - startTime}ms:`, error);
+    res.status(500).json({ error: 'Failed to score case studies.' });
+  }
+});
+
+// ── GET /api/case-studies ───────────────────────────────────
 
 app.get('/api/case-studies', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');

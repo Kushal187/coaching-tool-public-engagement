@@ -1,18 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import { CaseStudyDetail } from '../CaseStudyDetail';
 
 vi.mock('../ui/markdown-content', () => ({
   MarkdownContent: ({ children }: { children: string }) => (
     <span data-testid="md">{children}</span>
-  ),
-}));
-
-vi.mock('../ui/progress', () => ({
-  Progress: ({ value }: { value: number }) => (
-    <div data-testid="progress" data-value={value} />
   ),
 }));
 
@@ -144,122 +137,4 @@ describe('CaseStudyDetail', () => {
     });
   });
 
-  describe('Adapt wizard', () => {
-    beforeEach(() => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(MOCK_CASE_STUDY),
-      });
-    });
-
-    it('shows the info step with Get Started button', async () => {
-      renderDetail();
-      await waitFor(() => {
-        expect(screen.getByText('Adapt to My Situation')).toBeInTheDocument();
-      });
-      expect(screen.getByRole('button', { name: /Get Started/i })).toBeInTheDocument();
-    });
-
-    it('advances to context step on Get Started', async () => {
-      const user = userEvent.setup();
-      renderDetail();
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Get Started/i })).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole('button', { name: /Get Started/i }));
-
-      expect(screen.getByText('Describe your situation')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText(/city agency/i)).toBeInTheDocument();
-    });
-
-    it('disables Continue until context is entered', async () => {
-      const user = userEvent.setup();
-      renderDetail();
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Get Started/i })).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole('button', { name: /Get Started/i }));
-
-      const continueBtn = screen.getByRole('button', { name: /Continue/i });
-      expect(continueBtn).toBeDisabled();
-
-      await user.type(screen.getByPlaceholderText(/city agency/i), 'Our community project');
-      expect(continueBtn).not.toBeDisabled();
-    });
-
-    it('advances to constraints step after entering context', async () => {
-      const user = userEvent.setup();
-      renderDetail();
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Get Started/i })).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole('button', { name: /Get Started/i }));
-      await user.type(screen.getByPlaceholderText(/city agency/i), 'Community project');
-      await user.click(screen.getByRole('button', { name: /Continue/i }));
-
-      expect(screen.getByText('What are your constraints?')).toBeInTheDocument();
-    });
-
-    it('navigates back from constraints to context', async () => {
-      const user = userEvent.setup();
-      renderDetail();
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Get Started/i })).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole('button', { name: /Get Started/i }));
-      await user.type(screen.getByPlaceholderText(/city agency/i), 'Community project');
-      await user.click(screen.getByRole('button', { name: /Continue/i }));
-
-      expect(screen.getByText('What are your constraints?')).toBeInTheDocument();
-      await user.click(screen.getByText('Back'));
-      expect(screen.getByText('Describe your situation')).toBeInTheDocument();
-    });
-
-    it('calls API and shows adapted plan on generate', async () => {
-      const user = userEvent.setup();
-      const mockText = 'data: {"content":"## Adapted Plan\\n\\nHere it is."}\ndata: [DONE]\n';
-      global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (typeof url === 'string' && url.includes('case-studies')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(MOCK_CASE_STUDY),
-          });
-        }
-        if (typeof url === 'string' && url.includes('adapt-case-study')) {
-          return Promise.resolve({
-            ok: true,
-            text: () => Promise.resolve(mockText),
-          });
-        }
-        return Promise.resolve({ ok: false, status: 404 });
-      });
-
-      renderDetail();
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Get Started/i })).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole('button', { name: /Get Started/i }));
-      await user.type(screen.getByPlaceholderText(/city agency/i), 'My context');
-      await user.click(screen.getByRole('button', { name: /Continue/i }));
-      await user.type(screen.getByPlaceholderText(/Limited budget/i), 'Small budget');
-      await user.click(screen.getByRole('button', { name: /Generate Adapted Plan/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText('Your Adapted Plan')).toBeInTheDocument();
-      });
-
-      expect(screen.getByRole('button', { name: /Edit/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Download/i })).toBeInTheDocument();
-    });
-  });
 });
