@@ -14,7 +14,6 @@ import {
   buildSourceDocuments,
 } from './lib/agent-tools.mjs';
 import { formatSSEChunk, formatSSESources, formatSSEDone } from './lib/sse.mjs';
-import adminRoutes from './lib/admin-routes.mjs';
 import {
   CHATBOT_PROMPT,
   GENERATE_PLAN_PROMPT,
@@ -1058,10 +1057,6 @@ app.get('/api/case-studies', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch case studies.' });
   }
 });
-
-// ── Admin API ───────────────────────────────────────────────
-
-app.use('/api/admin', adminRoutes);
 
 // ── Static Files (production) ───────────────────────────────
 

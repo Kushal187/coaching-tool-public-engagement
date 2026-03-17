@@ -6,11 +6,6 @@ import { AssessmentDashboard } from "./components/AssessmentDashboard";
 import { Reflection } from "./components/Reflection";
 import { CaseStudies } from "./components/CaseStudies";
 import { CaseStudyDetail } from "./components/CaseStudyDetail";
-import { AdminLayout } from "./components/admin/AdminLayout";
-import { AdminDashboard } from "./components/admin/AdminDashboard";
-import { DocumentExplorer } from "./components/admin/DocumentExplorer";
-import { PipelineManager } from "./components/admin/PipelineManager";
-
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -22,15 +17,6 @@ export const router = createBrowserRouter([
       { path: "coach/reflection", Component: Reflection },
       { path: "case-studies", Component: CaseStudies },
       { path: "case-studies/:caseStudyId", Component: CaseStudyDetail },
-      {
-        path: "admin",
-        Component: AdminLayout,
-        children: [
-          { index: true, Component: AdminDashboard },
-          { path: "documents", Component: DocumentExplorer },
-          { path: "pipeline", Component: PipelineManager },
-        ],
-      },
     ],
   },
 ]);
