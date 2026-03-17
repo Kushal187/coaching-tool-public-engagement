@@ -114,16 +114,18 @@ export function Reflection() {
       const data = await res.json();
       setReflection(data.reflection);
 
-      const searchParts = [responses[1] || '', responses[2] || ''];
-      const searchQuery = searchParts.join(' ').trim().slice(0, 300);
-      if (searchQuery) {
+      const hasResponses = Object.values(responses).some((v) => v && v.trim());
+      if (hasResponses) {
         try {
-          const csRes = await fetch(
-            `/api/case-studies?q=${encodeURIComponent(searchQuery)}`,
-          );
+          const csRes = await fetch('/api/score-case-studies', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nestaResponses: responses }),
+          });
           if (csRes.ok) {
-            const csData: CaseStudy[] = await csRes.json();
-            setSuggestedCaseStudies(csData.slice(0, 5));
+            const csData = await csRes.json();
+            const scored: CaseStudy[] = csData.scoredCaseStudies ?? [];
+            setSuggestedCaseStudies(scored.slice(0, 5));
           }
         } catch {
           /* non-critical */
@@ -370,8 +372,9 @@ export function Reflection() {
       y += 4;
 
       suggestedCaseStudies.forEach((cs, i) => {
-        checkPage(24);
-        writeWrapped(`${i + 1}. ${cs.title}`, 11, [30, 30, 30], 'bold');
+        checkPage(28);
+        const scoreLabel = cs.relevancyScore != null ? ` (${cs.relevancyScore}% match)` : '';
+        writeWrapped(`${i + 1}. ${cs.title}${scoreLabel}`, 11, [30, 30, 30], 'bold');
         y += 1;
         writeWrapped(
           `Location: ${cs.location} | Scale: ${cs.scale}`,
@@ -384,6 +387,10 @@ export function Reflection() {
           y += 1;
         }
         writeWrapped(cs.summary, 10);
+        if (cs.relevancyReason) {
+          y += 1;
+          writeWrapped(`Relevancy: ${cs.relevancyReason}`, 9, [100, 100, 100], 'normal', 4);
+        }
         y += 6;
       });
     }
@@ -694,9 +701,24 @@ export function Reflection() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-[#124D8F] mb-1 group-hover:underline">
-                      {cs.title}
-                    </h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-[#124D8F] group-hover:underline">
+                        {cs.title}
+                      </h3>
+                      {cs.relevancyScore != null && (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
+                            cs.relevancyScore >= 70
+                              ? 'bg-green-100 text-green-800'
+                              : cs.relevancyScore >= 50
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          {cs.relevancyScore}% match
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
                       <span className="inline-flex items-center gap-1">
                         <MapPin className="w-3 h-3" />
@@ -707,6 +729,11 @@ export function Reflection() {
                     <p className="text-sm text-gray-600 line-clamp-2">
                       {cs.summary}
                     </p>
+                    {cs.relevancyReason && (
+                      <p className="text-xs text-gray-400 mt-1.5 italic line-clamp-2">
+                        {cs.relevancyReason}
+                      </p>
+                    )}
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {cs.tags.slice(0, 4).map((tag) => (
                         <Badge key={tag} variant="secondary" className="text-xs">

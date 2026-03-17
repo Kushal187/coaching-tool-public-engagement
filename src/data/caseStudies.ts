@@ -13,4 +13,6 @@ export type CaseStudy = {
   sourceLabel: string;
   docDate: string;
   fullContent?: string;
+  relevancyScore?: number;
+  relevancyReason?: string;
 };
