@@ -8,38 +8,34 @@ Adapted from the [Rebooting Democracy](https://github.com/CitizensFoundation/reb
 
 ## Architecture
 
-```
-documents/*.pdf
-       │
-       ▼
-┌──────────────┐    ┌────────────┐    ┌──────────┐
-│ ingest-pdfs  │───▶│  Weaviate  │◀───│ chatbot  │
-│  (CLI script)│    │ (vectors)  │    │ (Netlify │
-└──────────────┘    └────────────┘    │  function)│
-                                      └─────┬────┘
-                                            │ OpenAI
-                                            ▼
-                                      LLM response
-```
+Current runtime: `React + Vite` frontend, `Express` API server, `Weaviate`, and `OpenAI`, deployed as a Render web service. The older Netlify / serverless sketch is no longer accurate for this repo.
+
+![Current architecture](docs/architecture-current-horizontal.svg)
 
 ### Pipeline summary
 
 | Step | Component | Description |
 |------|-----------|-------------|
-| **Ingest** | `scripts/ingest-pdfs.mjs` | Reads PDFs from `documents/`, extracts text, uses LLM to intelligently split into chapters, stores in Weaviate |
-| **Search** | BM25 → nearText fallback | Keyword search first; if no hits, falls back to semantic vector search |
-| **Chat** | `netlify/functions/chatbot.mjs` | Receives user question, retrieves context from Weaviate, streams an OpenAI response |
+| **Serve app** | `server.mjs` + `dist/` | Serves the React SPA and exposes the `/api/*` endpoints |
+| **Chat / coaching** | `POST /api/chatbot` | Runs OpenAI tool-calling against Weaviate and streams SSE responses back to the client |
+| **Assessment / reflection** | `server.mjs` routes | Evaluates Nesta responses, generates scenarios, reflections, and case-study recommendations |
+| **Main ingest path** | `scripts/ingest.py` | Reads `data/registry/**/*.json` or `Data Tracker.xlsx`, chunks documents, classifies content, enriches case studies, and writes to Weaviate |
+| **Alternate PDF path** | `scripts/convert-pdfs.py` + `scripts/ingest-pdfs.mjs` | Converts PDFs to Markdown and indexes chunked content into `CoachingTool` |
+| **Search** | Weaviate hybrid / nearText | Retrieval against `CoachingTool` and `CaseStudyLibrary` |
 
-### Chunking strategy
+### Chunking and enrichment
 
-The ingestion uses an **LLM-based intelligent chunking** approach (adapted from `DocumentTreeSplitAgent`):
+The repo currently has two chunking paths:
 
-1. The full document (with line numbers) is sent to GPT-5.1 to devise a chapter-based splitting strategy
-2. A second LLM call reviews and validates the strategy (PASSES / FAILS)
-3. If the review fails, the strategy is regenerated with the feedback (up to 5 retries)
-4. Chapters exceeding 50 lines are recursively sub-chunked
-5. Aggregated chunk data is validated against the original to ensure nothing was lost
-6. Falls back to simple word-boundary chunking if the LLM approach fails
+1. `scripts/ingest.py` for the main registry / Excel pipeline
+   - Uses Markdown-heading chunking when headings are present
+   - Falls back to sliding-window chunking for unstructured text
+   - Uses OpenAI for content classification and case-study metadata generation
+2. `scripts/ingest-pdfs.mjs` + `lib/chunking.mjs` for the alternate PDF pipeline
+   - Uses heading-aware Markdown section parsing
+   - Sub-splits oversized sections with overlap
+   - Adds contextual retrieval prefixes before indexing
+   - Falls back to simple character-boundary chunking when needed
 
 ---
 
@@ -84,14 +80,14 @@ cp .env.example .env
 # 3. Place your PDF files in the documents/ folder
 cp /path/to/your/files/*.pdf documents/
 
-# 4. Run the ingestion pipeline
-npm run ingest
+# 4. Run the main ingestion pipeline
+python scripts/ingest.py --source registry
 
-# 5. Start the local dev server (Netlify CLI)
-npx netlify dev
+# 5. Start the local dev stack
+npm run dev
 ```
 
-The chatbot UI will be at `http://localhost:8888/` and the API endpoint at `http://localhost:8888/.netlify/functions/chatbot`.
+The Vite app runs at `http://localhost:3001/` and proxies `/api/*` requests to the Express server at `http://localhost:3000/`.
 
 ---
 
@@ -100,20 +96,24 @@ The chatbot UI will be at `http://localhost:8888/` and the API endpoint at `http
 ### Ingest PDFs
 
 ```bash
-# LLM-based intelligent chunking (default)
+# Main registry / Excel pipeline
+python scripts/ingest.py --source registry
+
+# Single-file registry ingest
+python scripts/ingest.py --source registry --registry-file data/registry/<path>.json
+
+# Wipe both Weaviate collections and rebuild
+python scripts/ingest.py --clear
+
+# Alternate PDF-only path
+npm run convert
 npm run ingest
-
-# Fast word-boundary chunking (no LLM calls, cheaper)
-npm run ingest -- --simple
-
-# Wipe the Weaviate collection and re-ingest from scratch
-npm run ingest -- --clear
 ```
 
 ### Query the chatbot
 
 ```bash
-curl -X POST http://localhost:8888/.netlify/functions/chatbot \
+curl -X POST http://localhost:3000/api/chatbot \
   -H "Content-Type: application/json" \
   -d '{"message": "What are the key findings?"}'
 ```
@@ -136,20 +136,27 @@ data: [DONE]
 
 ```
 coaching-tool-public-engagement/
-├── documents/                  # Place your PDFs here
+├── data/registry/              # Curated + admin-created JSON source documents
+├── documents/                  # PDFs and converted Markdown for the alternate PDF path
+├── docs/
+│   └── architecture-current-horizontal.svg
 ├── lib/
 │   ├── weaviate-client.mjs     # Shared Weaviate + OpenAI client init
-│   ├── chunking.mjs            # LLM-based chunking + simple fallback
+│   ├── agent-runner.mjs        # OpenAI tool-calling loop
+│   ├── agent-tools.mjs         # Weaviate-backed tool definitions
+│   ├── admin-routes.mjs        # Admin ingest and document APIs
+│   ├── chunking.mjs            # Heading-aware Markdown chunking for PDF pipeline
 │   └── schema.mjs              # Weaviate collection schema management
 ├── scripts/
-│   └── ingest-pdfs.mjs         # CLI: PDF → Weaviate ingestion
-├── netlify/
-│   └── functions/
-│       └── chatbot.mjs         # Netlify function: RAG chatbot endpoint
-├── public/
-│   └── index.html              # Chat UI (standalone HTML/CSS/JS)
+│   ├── ingest.py               # Main registry / Excel ingestion pipeline
+│   ├── ingest-pdfs.mjs         # Alternate PDF → Weaviate ingestion
+│   ├── convert-pdfs.py         # Bulk PDF → Markdown conversion
+│   └── convert-pdf-to-md.py    # Single PDF → Markdown conversion
+├── src/                        # React application
+├── prompts/                    # System prompts and scenario descriptions
+├── server.mjs                  # Express server and API routes
 ├── .env.example                # Environment variable template
-├── netlify.toml                # Netlify configuration
+├── render.yaml                 # Render deployment config
 ├── package.json                # Dependencies & scripts
 └── README.md
 ```

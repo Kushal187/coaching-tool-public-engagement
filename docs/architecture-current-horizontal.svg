@@ -1,0 +1,302 @@
+<svg width="2400" height="1450" viewBox="0 0 2400 1450" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .bg { fill: #F6F8FC; }
+      .panel { fill: #FFFFFF; stroke: #D7DEEA; stroke-width: 2; rx: 28; ry: 28; }
+      .subpanel { fill: #F9FBFF; stroke: #DDE6F3; stroke-width: 2; rx: 18; ry: 18; }
+      .box-blue { fill: #E8F1FF; stroke: #7BA7E5; stroke-width: 2; rx: 18; ry: 18; }
+      .box-green { fill: #EAF8F0; stroke: #73B98E; stroke-width: 2; rx: 18; ry: 18; }
+      .box-purple { fill: #F2ECFF; stroke: #9E8BE0; stroke-width: 2; rx: 18; ry: 18; }
+      .box-amber { fill: #FFF4D9; stroke: #D6A54A; stroke-width: 2; rx: 18; ry: 18; }
+      .box-rose { fill: #FFECEF; stroke: #E08A98; stroke-width: 2; rx: 18; ry: 18; }
+      .box-slate { fill: #F4F7FB; stroke: #A8B5C7; stroke-width: 2; rx: 18; ry: 18; }
+      .title { font: 700 34px 'Inter', 'Segoe UI', sans-serif; fill: #17304F; }
+      .subtitle { font: 500 18px 'Inter', 'Segoe UI', sans-serif; fill: #53657D; }
+      .panel-title { font: 700 24px 'Inter', 'Segoe UI', sans-serif; fill: #17304F; }
+      .box-title { font: 700 18px 'Inter', 'Segoe UI', sans-serif; fill: #17304F; }
+      .box-text { font: 500 14px 'Inter', 'Segoe UI', sans-serif; fill: #34465E; }
+      .small { font: 500 12px 'Inter', 'Segoe UI', sans-serif; fill: #62758E; }
+      .chip { fill: #17304F; }
+      .chip-text { font: 700 11px 'Inter', 'Segoe UI', sans-serif; fill: #FFFFFF; letter-spacing: 0.06em; text-transform: uppercase; }
+      .arrow-blue { stroke: #2D6CDF; stroke-width: 4; fill: none; }
+      .arrow-green { stroke: #188A5B; stroke-width: 4; fill: none; }
+      .arrow-purple { stroke: #7A56D8; stroke-width: 4; fill: none; }
+      .arrow-amber { stroke: #C78516; stroke-width: 4; fill: none; }
+      .arrow-slate { stroke: #70839D; stroke-width: 3; fill: none; stroke-dasharray: 10 8; }
+      .label { font: 600 13px 'Inter', 'Segoe UI', sans-serif; fill: #3A4F6A; }
+    </style>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2D6CDF"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#188A5B"/>
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7A56D8"/>
+    </marker>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#C78516"/>
+    </marker>
+    <marker id="arrowSlate" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#70839D"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="2400" height="1450"/>
+
+  <text class="title" x="60" y="64">Coaching Tool Architecture — Current Codebase</text>
+  <text class="subtitle" x="60" y="98">Horizontal redraw from the actual implementation. Current runtime is React + Express + Weaviate + OpenAI on Render, not the older AWS Lambda / API Gateway / Step Functions sketch.</text>
+
+  <rect class="panel" x="40" y="130" width="520" height="560"/>
+  <rect class="panel" x="600" y="130" width="590" height="560"/>
+  <rect class="panel" x="1230" y="130" width="520" height="560"/>
+  <rect class="panel" x="1790" y="130" width="570" height="560"/>
+  <rect class="panel" x="40" y="730" width="2320" height="660"/>
+
+  <text class="panel-title" x="72" y="172">1. Clients and Deployment</text>
+  <text class="panel-title" x="632" y="172">2. Express API Surface</text>
+  <text class="panel-title" x="1262" y="172">3. AI Orchestration</text>
+  <text class="panel-title" x="1822" y="172">4. Data and Assets</text>
+  <text class="panel-title" x="72" y="772">5. Ingestion and Indexing Pipelines</text>
+
+  <rect class="chip" x="72" y="188" width="112" height="24" rx="12"/>
+  <text class="chip-text" x="88" y="204">Render Web</text>
+  <text class="small" x="198" y="205">`render.yaml` builds Vite and starts `node server.mjs`</text>
+
+  <rect class="box-blue" x="72" y="232" width="456" height="180"/>
+  <text class="box-title" x="92" y="260">React / Vite SPA</text>
+  <text class="box-text" x="92" y="290">Routes: `/`, `/coach`, `/coach/dashboard`, `/coach/reflection`</text>
+  <text class="box-text" x="92" y="314">Routes: `/case-studies`, `/case-studies/:id`, `/admin/*`</text>
+  <text class="box-text" x="92" y="338">Served by Express from `dist/` in production</text>
+  <text class="box-text" x="92" y="362">`ChatBot` and `CoachingChatPanel` call `/api/chatbot`</text>
+  <text class="box-text" x="92" y="386">Assessment state and chat history stored in `sessionStorage`</text>
+
+  <rect class="box-green" x="72" y="434" width="214" height="214"/>
+  <text class="box-title" x="92" y="462">Public UX</text>
+  <text class="box-text" x="92" y="492">Coach form</text>
+  <text class="box-text" x="92" y="516">Assessment dashboard</text>
+  <text class="box-text" x="92" y="540">Reflection + PDF export</text>
+  <text class="box-text" x="92" y="564">Case study browser + detail</text>
+  <text class="box-text" x="92" y="588">Floating Q&amp;A assistant</text>
+
+  <rect class="box-amber" x="314" y="434" width="214" height="214"/>
+  <text class="box-title" x="334" y="462">Admin UX</text>
+  <text class="box-text" x="334" y="492">Overview / stats</text>
+  <text class="box-text" x="334" y="516">Document explorer</text>
+  <text class="box-text" x="334" y="540">Pipeline manager</text>
+  <text class="box-text" x="334" y="564">Text / URL / PDF ingest</text>
+  <text class="box-text" x="334" y="588">Manual pipeline runs</text>
+
+  <rect class="box-slate" x="632" y="232" width="548" height="110"/>
+  <text class="box-title" x="652" y="260">`server.mjs` + `lib/admin-routes.mjs`</text>
+  <text class="box-text" x="652" y="290">Express 5, JSON bodies up to 50 MB, CORS, static file serving, SSE formatting via `lib/sse.mjs`</text>
+  <text class="box-text" x="652" y="314">Current deployment is a long-running Node process, so streaming is done directly without serverless limits</text>
+
+  <rect class="box-blue" x="632" y="366" width="256" height="282"/>
+  <text class="box-title" x="652" y="394">User-facing endpoints</text>
+  <text class="box-text" x="652" y="424">`POST /api/chatbot`</text>
+  <text class="box-text" x="652" y="448">`POST /api/analyze-cross-resolution`</text>
+  <text class="box-text" x="652" y="472">`POST /api/evaluate-assessment`</text>
+  <text class="box-text" x="652" y="496">`POST /api/generate-scenario-responses`</text>
+  <text class="box-text" x="652" y="520">`POST /api/generate-reflection`</text>
+  <text class="box-text" x="652" y="544">`POST /api/score-case-studies`</text>
+  <text class="box-text" x="652" y="568">`GET /api/case-studies`</text>
+  <text class="box-text" x="652" y="592">Implemented but not wired in React:</text>
+  <text class="box-text" x="670" y="616">`/api/generate-plan`, `/api/generate-questions`, `/api/adapt-case-study`</text>
+
+  <rect class="box-amber" x="912" y="366" width="268" height="282"/>
+  <text class="box-title" x="932" y="394">Admin endpoints</text>
+  <text class="box-text" x="932" y="424">`GET /api/admin/stats`</text>
+  <text class="box-text" x="932" y="448">`GET /api/admin/documents`</text>
+  <text class="box-text" x="932" y="472">`GET /api/admin/documents/:id`</text>
+  <text class="box-text" x="932" y="496">`DELETE /api/admin/documents/:id`</text>
+  <text class="box-text" x="932" y="520">`POST /api/admin/ingest/text`</text>
+  <text class="box-text" x="932" y="544">`POST /api/admin/ingest/url`</text>
+  <text class="box-text" x="932" y="568">`POST /api/admin/ingest/pdf/convert`</text>
+  <text class="box-text" x="932" y="592">`POST /api/admin/ingest/pdf/confirm`</text>
+  <text class="box-text" x="932" y="616">`POST /api/admin/classify`, `/api/admin/pipeline/run`, `/api/admin/pipeline/status`</text>
+
+  <rect class="box-green" x="1262" y="232" width="456" height="180"/>
+  <text class="box-title" x="1282" y="260">Agent loop for retrieval-backed generation</text>
+  <text class="box-text" x="1282" y="290">`resolveAgentToolCalls()` and `runAgentLoop()` in `lib/agent-runner.mjs`</text>
+  <text class="box-text" x="1282" y="314">Tool definitions in `lib/agent-tools.mjs`:</text>
+  <text class="box-text" x="1300" y="338">`search_knowledge_base(query, content_type_filter)`</text>
+  <text class="box-text" x="1300" y="362">`get_document_details(document_id)`</text>
+  <text class="box-text" x="1282" y="386">Used by chatbot plus several generator/evaluator endpoints</text>
+
+  <rect class="box-purple" x="1262" y="436" width="220" height="212"/>
+  <text class="box-title" x="1282" y="464">OpenAI calls</text>
+  <text class="box-text" x="1282" y="494">Chat completion + SSE</text>
+  <text class="box-text" x="1282" y="518">Assessment evaluation</text>
+  <text class="box-text" x="1282" y="542">Scenario generation</text>
+  <text class="box-text" x="1282" y="566">Reflection generation</text>
+  <text class="box-text" x="1282" y="590">Cross-resolution check</text>
+  <text class="box-text" x="1282" y="614">Background coaching eval</text>
+
+  <rect class="box-rose" x="1502" y="436" width="216" height="212"/>
+  <text class="box-title" x="1522" y="464">Models in code</text>
+  <text class="box-text" x="1522" y="494">Default runtime model:</text>
+  <text class="box-text" x="1540" y="518">`CHATBOT_MODEL` → `gpt-5.1`</text>
+  <text class="box-text" x="1522" y="542">Admin classify:</text>
+  <text class="box-text" x="1540" y="566">`gpt-5.1-mini`</text>
+  <text class="box-text" x="1522" y="590">Ingestion classify + summarize:</text>
+  <text class="box-text" x="1540" y="614">`gpt-5.1-mini`</text>
+
+  <rect class="box-slate" x="1822" y="232" width="506" height="150"/>
+  <text class="box-title" x="1842" y="260">Primary stores and assets</text>
+  <text class="box-text" x="1842" y="290">`prompts/*.txt` and `prompts/scenario-descriptions.json` loaded by `prompts/load.mjs`</text>
+  <text class="box-text" x="1842" y="314">`data/registry/**/*.json` for curated/admin-added source documents</text>
+  <text class="box-text" x="1842" y="338">`Data Tracker.xlsx` for bulk Excel ingestion</text>
+  <text class="box-text" x="1842" y="362">`documents/*.pdf` and `documents/converted/*.md` for the PDF-based pipeline</text>
+
+  <rect class="box-purple" x="1822" y="408" width="244" height="240"/>
+  <text class="box-title" x="1842" y="436">Weaviate: `CoachingTool`</text>
+  <text class="box-text" x="1842" y="466">Chunked documents for RAG</text>
+  <text class="box-text" x="1842" y="490">Fields include content, source,</text>
+  <text class="box-text" x="1842" y="514">content type, section, chunk index</text>
+  <text class="box-text" x="1842" y="538">Queried via hybrid search,</text>
+  <text class="box-text" x="1842" y="562">nearText, and document-id lookups</text>
+  <text class="box-text" x="1842" y="586">Embeddings handled by Weaviate</text>
+  <text class="box-text" x="1842" y="610">`text2vec-openai` /</text>
+  <text class="box-text" x="1842" y="634">`text-embedding-3-small`</text>
+
+  <rect class="box-green" x="2084" y="408" width="244" height="240"/>
+  <text class="box-title" x="2104" y="436">Weaviate: `CaseStudyLibrary`</text>
+  <text class="box-text" x="2104" y="466">One entry per case study</text>
+  <text class="box-text" x="2104" y="490">Stored metadata:</text>
+  <text class="box-text" x="2104" y="514">summary, location, timeframe,</text>
+  <text class="box-text" x="2104" y="538">demographic, scale, tags,</text>
+  <text class="box-text" x="2104" y="562">key outcomes, implementation steps</text>
+  <text class="box-text" x="2104" y="586">Used by case-study browser</text>
+  <text class="box-text" x="2104" y="610">and reflection recommendations</text>
+
+  <rect class="subpanel" x="72" y="804" width="404" height="544"/>
+  <text class="box-title" x="92" y="834">A. Admin ingest entry points</text>
+  <rect class="box-blue" x="92" y="860" width="168" height="110"/>
+  <text class="box-title" x="112" y="888">Paste text</text>
+  <text class="box-text" x="112" y="918">`/api/admin/ingest/text`</text>
+  <text class="box-text" x="112" y="942">Writes registry JSON</text>
+  <rect class="box-blue" x="288" y="860" width="168" height="110"/>
+  <text class="box-title" x="308" y="888">Fetch URL</text>
+  <text class="box-text" x="308" y="918">`/api/admin/ingest/url`</text>
+  <text class="box-text" x="308" y="942">HTML text or PDF download</text>
+  <rect class="box-blue" x="92" y="996" width="168" height="110"/>
+  <text class="box-title" x="112" y="1024">Upload PDF</text>
+  <text class="box-text" x="112" y="1054">`/pdf/convert` then</text>
+  <text class="box-text" x="112" y="1078">`/pdf/confirm`</text>
+  <rect class="box-amber" x="288" y="996" width="168" height="110"/>
+  <text class="box-title" x="308" y="1024">Bulk run</text>
+  <text class="box-text" x="308" y="1054">`/api/admin/pipeline/run`</text>
+  <text class="box-text" x="308" y="1078">Excel, registry, or PDF mode</text>
+  <rect class="box-rose" x="92" y="1132" width="364" height="184"/>
+  <text class="box-title" x="112" y="1160">Optional pre-processing inside admin routes</text>
+  <text class="box-text" x="112" y="1190">`/api/admin/classify` uses OpenAI to suggest `content_type` + summary</text>
+  <text class="box-text" x="112" y="1214">PDF routes call `python3 scripts/convert-pdf-to-md.py` (Docling)</text>
+  <text class="box-text" x="112" y="1238">URL ingest can download a PDF into `documents/` and extract Markdown preview</text>
+  <text class="box-text" x="112" y="1262">Final confirmation writes a registry file, then kicks `scripts/ingest.py --registry-file ...`</text>
+
+  <rect class="subpanel" x="520" y="804" width="1020" height="544"/>
+  <text class="box-title" x="540" y="834">B. Main registry / Excel pipeline</text>
+  <rect class="box-green" x="540" y="860" width="258" height="148"/>
+  <text class="box-title" x="560" y="888">Inputs</text>
+  <text class="box-text" x="560" y="918">`data/registry/**/*.json`</text>
+  <text class="box-text" x="560" y="942">or `Data Tracker.xlsx`</text>
+  <text class="box-text" x="560" y="966">Single-file or full-batch mode</text>
+  <text class="box-text" x="560" y="990">Triggered by admin routes or CLI</text>
+
+  <rect class="box-purple" x="830" y="860" width="332" height="208"/>
+  <text class="box-title" x="850" y="888">`scripts/ingest.py` document processing</text>
+  <text class="box-text" x="850" y="918">`chunk_dane()` for registry / Excel content</text>
+  <text class="box-text" x="850" y="942">`chunk_participedia()` for Participedia cases</text>
+  <text class="box-text" x="850" y="966">Markdown-heading chunking or sliding windows</text>
+  <text class="box-text" x="850" y="990">LLM content classification with cache</text>
+  <text class="box-text" x="850" y="1014">Stable UUID5 document ids</text>
+  <text class="box-text" x="850" y="1038">Batch insert into `CoachingTool`</text>
+
+  <rect class="box-rose" x="1194" y="860" width="326" height="208"/>
+  <text class="box-title" x="1214" y="888">Case study library enrichment</text>
+  <text class="box-text" x="1214" y="918">When a document is classified as `case_study`,</text>
+  <text class="box-text" x="1214" y="942">`_generate_case_study_metadata()` calls OpenAI</text>
+  <text class="box-text" x="1214" y="966">to produce summary + structured metadata</text>
+  <text class="box-text" x="1214" y="990">Parallelized with a thread pool and JSON cache</text>
+  <text class="box-text" x="1214" y="1014">Batch insert into `CaseStudyLibrary`</text>
+
+  <rect class="box-slate" x="540" y="1098" width="980" height="218"/>
+  <text class="box-title" x="560" y="1126">Result of the main pipeline</text>
+  <text class="box-text" x="560" y="1156">1. Curated source documents become chunked RAG records in `CoachingTool`</text>
+  <text class="box-text" x="560" y="1180">2. Case studies also become summarized top-level documents in `CaseStudyLibrary`</text>
+  <text class="box-text" x="560" y="1204">3. Admin dashboard reads counts and breakdowns from Weaviate aggregations</text>
+  <text class="box-text" x="560" y="1228">4. Document Explorer reads chunk metadata and can delete matching `document_id` records from both collections</text>
+
+  <rect class="subpanel" x="1584" y="804" width="744" height="544"/>
+  <text class="box-title" x="1604" y="834">C. Alternate PDF pipeline still present in the repo</text>
+  <rect class="box-amber" x="1604" y="860" width="208" height="144"/>
+  <text class="box-title" x="1624" y="888">Step 1</text>
+  <text class="box-text" x="1624" y="918">`scripts/convert-pdfs.py`</text>
+  <text class="box-text" x="1624" y="942">converts `documents/*.pdf`</text>
+  <text class="box-text" x="1624" y="966">to `documents/converted/*.md`</text>
+
+  <rect class="box-amber" x="1848" y="860" width="228" height="144"/>
+  <text class="box-title" x="1868" y="888">Step 2</text>
+  <text class="box-text" x="1868" y="918">`scripts/ingest-pdfs.mjs`</text>
+  <text class="box-text" x="1868" y="942">reads converted Markdown</text>
+  <text class="box-text" x="1868" y="966">and indexes only `CoachingTool`</text>
+
+  <rect class="box-purple" x="2108" y="860" width="200" height="144"/>
+  <text class="box-title" x="2128" y="888">Chunking module</text>
+  <text class="box-text" x="2128" y="918">`lib/chunking.mjs`</text>
+  <text class="box-text" x="2128" y="942">heading-aware split,</text>
+  <text class="box-text" x="2128" y="966">overlap, retrieval prefix</text>
+
+  <rect class="box-slate" x="1604" y="1040" width="704" height="276"/>
+  <text class="box-title" x="1624" y="1068">Where this path fits</text>
+  <text class="box-text" x="1624" y="1098">This is the older PDF-oriented ingestion path referenced by `npm run pipeline` and by admin pipeline mode `source: "pdf"`.</text>
+  <text class="box-text" x="1624" y="1122">It does not build `CaseStudyLibrary`; it writes chunked records into `CoachingTool` after structure-aware Markdown chunking.</text>
+  <text class="box-text" x="1624" y="1146">The codebase therefore contains two ingestion families:</text>
+  <text class="box-text" x="1642" y="1170">• Main path: `scripts/ingest.py` for registry / Excel + case-study enrichment</text>
+  <text class="box-text" x="1642" y="1194">• Alternate path: `convert-pdfs.py` + `ingest-pdfs.mjs` for converted PDFs</text>
+  <text class="box-text" x="1624" y="1238">The horizontal diagram keeps both because both are still callable from code.</text>
+
+  <path class="arrow-blue" marker-end="url(#arrowBlue)" d="M 528 322 C 562 322, 580 322, 620 322"/>
+  <text class="label" x="540" y="306">HTTP + SSE</text>
+
+  <path class="arrow-green" marker-end="url(#arrowGreen)" d="M 1190 322 C 1210 322, 1220 322, 1262 322"/>
+  <text class="label" x="1204" y="306">Prompted flows</text>
+
+  <path class="arrow-purple" marker-end="url(#arrowPurple)" d="M 1748 322 C 1770 322, 1784 322, 1822 322"/>
+  <text class="label" x="1760" y="306">Queries + metadata</text>
+
+  <path class="arrow-purple" marker-end="url(#arrowPurple)" d="M 1718 502 C 1770 502, 1774 502, 1822 502"/>
+  <text class="label" x="1730" y="488">tool search / reads</text>
+
+  <path class="arrow-purple" marker-end="url(#arrowPurple)" d="M 1718 600 C 1770 600, 1774 600, 2084 600"/>
+  <text class="label" x="1730" y="586">case-study scoring + browse</text>
+
+  <path class="arrow-blue" marker-end="url(#arrowBlue)" d="M 760 648 C 760 694, 146 694, 146 640"/>
+  <text class="label" x="496" y="686">streamed chatbot answer + sources</text>
+
+  <path class="arrow-green" marker-end="url(#arrowGreen)" d="M 1372 412 C 1372 468, 1372 468, 1372 436"/>
+
+  <path class="arrow-amber" marker-end="url(#arrowAmber)" d="M 276 860 C 276 860, 276 860, 540 934"/>
+  <text class="label" x="364" y="896">registry entry</text>
+
+  <path class="arrow-amber" marker-end="url(#arrowAmber)" d="M 372 970 C 372 1044, 372 1180, 540 1180"/>
+  <text class="label" x="386" y="1088">classification / preview</text>
+
+  <path class="arrow-amber" marker-end="url(#arrowAmber)" d="M 1888 932 C 2000 932, 2078 932, 2108 932"/>
+  <path class="arrow-amber" marker-end="url(#arrowAmber)" d="M 1812 932 C 1830 932, 1840 932, 1848 932"/>
+
+  <path class="arrow-amber" marker-end="url(#arrowAmber)" d="M 1032 1068 C 1032 1090, 1032 1090, 1032 1098"/>
+  <path class="arrow-purple" marker-end="url(#arrowPurple)" d="M 1520 960 C 1710 960, 1860 960, 1860 648"/>
+  <path class="arrow-purple" marker-end="url(#arrowPurple)" d="M 1520 1012 C 2110 1012, 2206 1012, 2206 648"/>
+  <text class="label" x="1720" y="740">writes both collections</text>
+
+  <path class="arrow-purple" marker-end="url(#arrowPurple)" d="M 2208 1004 C 2208 960, 2208 890, 2208 648"/>
+  <text class="label" x="2058" y="740">writes `CoachingTool` only</text>
+
+  <path class="arrow-slate" marker-end="url(#arrowSlate)" d="M 1046 648 C 1046 716, 1046 716, 1046 804"/>
+  <text class="label" x="952" y="734">admin pipeline / CLI</text>
+
+  <path class="arrow-slate" marker-end="url(#arrowSlate)" d="M 1440 648 C 1440 716, 1900 716, 1900 804"/>
+  <text class="label" x="1564" y="734">legacy PDF path still callable</text>
+</svg>
