@@ -9,6 +9,8 @@ import {
   Trash2,
   ExternalLink,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 
@@ -36,8 +38,13 @@ interface DocumentDetail {
   chunks: { chunk_index: number; section_name: string; content: string }[];
 }
 
+const PAGE_SIZE = 20;
+
 export function DocumentExplorer() {
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,12 +59,13 @@ export function DocumentExplorer() {
 
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  const fetchDocuments = useCallback(async () => {
+  const fetchDocuments = useCallback(async (targetPage = 1) => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
-      params.set('limit', '200');
+      params.set('pageSize', String(PAGE_SIZE));
+      params.set('page', String(targetPage));
       if (contentType) params.set('content_type', contentType);
       if (docType) params.set('doc_type', docType);
       if (sourceLabel) params.set('source_label', sourceLabel);
@@ -66,6 +74,9 @@ export function DocumentExplorer() {
       if (!res.ok) throw new Error(`Failed to load documents (${res.status})`);
       const data = await res.json();
       setDocuments(data.documents || []);
+      setTotal(data.total ?? 0);
+      setTotalPages(data.totalPages ?? 1);
+      setPage(data.page ?? targetPage);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load documents.');
     } finally {
@@ -74,7 +85,8 @@ export function DocumentExplorer() {
   }, [contentType, docType, sourceLabel]);
 
   useEffect(() => {
-    fetchDocuments();
+    setPage(1);
+    fetchDocuments(1);
   }, [fetchDocuments]);
 
   const handleExpand = async (docId: string) => {
@@ -106,11 +118,11 @@ export function DocumentExplorer() {
     try {
       const res = await fetch(`/api/admin/documents/${docId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
-      setDocuments((prev) => prev.filter((d) => d.document_id !== docId));
       if (expandedId === docId) {
         setExpandedId(null);
         setDetail(null);
       }
+      await fetchDocuments(page);
     } catch (err) {
       alert('Failed to delete document.');
     } finally {
@@ -143,7 +155,7 @@ export function DocumentExplorer() {
           </p>
         </div>
         <button
-          onClick={fetchDocuments}
+          onClick={() => fetchDocuments(page)}
           className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
         >
           <RefreshCw className="w-4 h-4" />
@@ -250,14 +262,41 @@ export function DocumentExplorer() {
             )
           : documents;
 
+        const start = (page - 1) * PAGE_SIZE + 1;
+        const end = (page - 1) * PAGE_SIZE + documents.length;
+
         return (
         <>
-          <p className="text-sm text-gray-500">
-            Showing {filtered.length} document{filtered.length !== 1 ? 's' : ''}
-            {query && documents.length !== filtered.length
-              ? ` (filtered from ${documents.length})`
-              : ''}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              {total > 0
+                ? `${start}–${end} of ${total} document${total !== 1 ? 's' : ''}${query ? ' (filtered by name)' : ''}`
+                : 'No documents found'}
+            </p>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => { const p = page - 1; setPage(p); fetchDocuments(p); }}
+                  disabled={page <= 1}
+                  className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm text-gray-600 tabular-nums px-2">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  onClick={() => { const p = page + 1; setPage(p); fetchDocuments(p); }}
+                  disabled={page >= totalPages}
+                  className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="space-y-2">
             {filtered.map((doc) => (
@@ -396,9 +435,38 @@ export function DocumentExplorer() {
             <div className="text-center py-12">
               <p className="text-gray-400">
                 {query
-                  ? `No documents matching "${searchQuery}". Try a different search term.`
+                  ? `No documents on this page matching "${searchQuery}".`
                   : 'No documents found. Try adjusting filters or run the ingestion pipeline.'}
               </p>
+            </div>
+          )}
+
+          {totalPages > 1 && filtered.length > 0 && (
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <p className="text-sm text-gray-500">
+                {start}–{end} of {total} document{total !== 1 ? 's' : ''}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => { const p = page - 1; setPage(p); fetchDocuments(p); }}
+                  disabled={page <= 1}
+                  className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm text-gray-600 tabular-nums px-2">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  onClick={() => { const p = page + 1; setPage(p); fetchDocuments(p); }}
+                  disabled={page >= totalPages}
+                  className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
         </>
