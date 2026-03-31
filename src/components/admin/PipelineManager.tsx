@@ -15,6 +15,7 @@ import {
   Send,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
+import { getAdminAuthHeader } from './AdminLayout';
 
 type IngestMode = 'pdf' | 'url' | 'text' | 'bulk';
 
@@ -101,7 +102,7 @@ function TextIngestForm() {
     try {
       const res = await fetch('/api/admin/ingest/text', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAdminAuthHeader() },
         body: JSON.stringify({
           name, source, source_url: sourceUrl,
           doc_date: docDate, content_type: contentType || undefined,
@@ -224,7 +225,7 @@ function UrlIngestForm() {
     try {
       const res = await fetch('/api/admin/classify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAdminAuthHeader() },
         body: JSON.stringify({ name: docName, source, content: text }),
       });
       if (res.ok) {
@@ -249,7 +250,7 @@ function UrlIngestForm() {
     try {
       const res = await fetch('/api/admin/ingest/url', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAdminAuthHeader() },
         body: JSON.stringify({ url }),
       });
       const data = await res.json();
@@ -281,7 +282,7 @@ function UrlIngestForm() {
     try {
       const res = await fetch('/api/admin/ingest/text', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAdminAuthHeader() },
         body: JSON.stringify({
           name, source, source_url: sourceUrl,
           doc_date: docDate, content_type: contentType || undefined,
@@ -510,6 +511,7 @@ function PdfIngestForm() {
           'Content-Type': 'application/pdf',
           'X-Filename': file.name,
           'X-Doc-Name': encodeURIComponent(name),
+          ...getAdminAuthHeader(),
         },
         body: buffer,
       });
@@ -533,7 +535,7 @@ function PdfIngestForm() {
     try {
       const res = await fetch('/api/admin/classify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAdminAuthHeader() },
         body: JSON.stringify({ name, source, content }),
       });
       if (res.ok) {
@@ -556,7 +558,7 @@ function PdfIngestForm() {
     try {
       const res = await fetch('/api/admin/ingest/pdf/confirm', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAdminAuthHeader() },
         body: JSON.stringify({
           name,
           source: source || 'PDF Upload',
@@ -891,7 +893,7 @@ function PipelineControls() {
     try {
       const res = await fetch('/api/admin/pipeline/run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAdminAuthHeader() },
         body: JSON.stringify({ mode }),
       });
       const data = await res.json();

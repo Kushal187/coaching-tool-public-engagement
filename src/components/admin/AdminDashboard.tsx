@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
+import { getAdminAuthHeader } from './AdminLayout';
 import {
   Database,
   FileText,
@@ -34,7 +35,7 @@ export function AdminDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/stats');
+      const res = await fetch('/api/admin/stats', { headers: getAdminAuthHeader() });
       if (!res.ok) throw new Error(`Failed to load stats (${res.status})`);
       setStats(await res.json());
     } catch (err) {

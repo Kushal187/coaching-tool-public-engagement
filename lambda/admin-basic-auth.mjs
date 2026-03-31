@@ -4,28 +4,20 @@
 // and compares against Secrets Manager coaching-tool/admin-credentials.
 // Returns IAM policy Allow/Deny.
 
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+
 let cachedCredentials = null;
+const smClient = new SecretsManagerClient();
 
 async function loadCredentials() {
   if (cachedCredentials) return cachedCredentials;
 
-  // In Lambda, use the Secrets Manager Lambda Extension
   if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
-    const token = process.env.AWS_SESSION_TOKEN;
-    const secretId = 'coaching-tool/admin-credentials';
-
     try {
-      const resp = await fetch(
-        `http://localhost:2773/secretsmanager/get?secretId=${encodeURIComponent(secretId)}`,
-        { headers: { 'X-Aws-Parameters-Secrets-Token': token } },
+      const result = await smClient.send(
+        new GetSecretValueCommand({ SecretId: process.env.ADMIN_SECRET_ARN || 'coaching-tool/admin-credentials' }),
       );
-
-      if (!resp.ok) {
-        throw new Error(`Secrets Manager returned ${resp.status}`);
-      }
-
-      const data = await resp.json();
-      cachedCredentials = JSON.parse(data.SecretString);
+      cachedCredentials = JSON.parse(result.SecretString);
       return cachedCredentials;
     } catch (err) {
       console.error('Failed to load admin credentials from Secrets Manager:', err.message);

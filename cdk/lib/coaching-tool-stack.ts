@@ -945,11 +945,32 @@ export class CoachingToolStack extends cdk.Stack {
       };
     };
 
+    // CloudFront Function to rewrite SPA routes to /index.html
+    // Only applied to the default (S3) behavior so API 403/404 responses pass through.
+    const spaRewriteFn = new cloudfront.Function(this, 'SpaRewriteFunction', {
+      functionName: 'coaching-tool-spa-rewrite',
+      code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+  // If the URI has a file extension, serve it as-is (assets, etc.)
+  if (uri.includes('.')) return request;
+  // Otherwise rewrite to /index.html for SPA client-side routing
+  request.uri = '/index.html';
+  return request;
+}
+      `),
+    });
+
     const distribution = new cloudfront.Distribution(this, 'CoachingToolDistribution', {
       defaultBehavior: {
         origin: s3Origin,
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        functionAssociations: [{
+          function: spaRewriteFn,
+          eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+        }],
       },
       additionalBehaviors: {
         // LLM endpoints -> Function URLs (bypass API Gateway 29s timeout)
@@ -970,20 +991,6 @@ export class CoachingToolStack extends cdk.Stack {
         },
       },
       defaultRootObject: 'index.html',
-      errorResponses: [
-        {
-          httpStatus: 403,
-          responseHttpStatus: 200,
-          responsePagePath: '/index.html',
-          ttl: cdk.Duration.seconds(0),
-        },
-        {
-          httpStatus: 404,
-          responseHttpStatus: 200,
-          responsePagePath: '/index.html',
-          ttl: cdk.Duration.seconds(0),
-        },
-      ],
     });
 
     // =========================================================================

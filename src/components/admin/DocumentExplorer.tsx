@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
+import { getAdminAuthHeader } from './AdminLayout';
 
 interface Document {
   document_id: string;
@@ -70,7 +71,7 @@ export function DocumentExplorer() {
       if (docType) params.set('doc_type', docType);
       if (sourceLabel) params.set('source_label', sourceLabel);
 
-      const res = await fetch(`/api/admin/documents?${params}`);
+      const res = await fetch(`/api/admin/documents?${params}`, { headers: getAdminAuthHeader() });
       if (!res.ok) throw new Error(`Failed to load documents (${res.status})`);
       const data = await res.json();
       setDocuments(data.documents || []);
@@ -99,7 +100,7 @@ export function DocumentExplorer() {
     setExpandedId(docId);
     setDetailLoading(true);
     try {
-      const res = await fetch(`/api/admin/documents/${docId}`);
+      const res = await fetch(`/api/admin/documents/${docId}`, { headers: getAdminAuthHeader() });
       if (!res.ok) throw new Error('Failed to load document details');
       setDetail(await res.json());
     } catch {
@@ -116,7 +117,7 @@ export function DocumentExplorer() {
 
     setDeleting(docId);
     try {
-      const res = await fetch(`/api/admin/documents/${docId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/documents/${docId}`, { method: 'DELETE', headers: getAdminAuthHeader() });
       if (!res.ok) throw new Error('Delete failed');
       if (expandedId === docId) {
         setExpandedId(null);
