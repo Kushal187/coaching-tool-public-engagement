@@ -9,6 +9,16 @@ package-lock.json
 # Docling-converted Markdown files (generated from PDFs)
 documents/converted/
 
+# Lambda layer dependencies (built locally, not committed)
+layer/nodejs/node_modules/
+layer/nodejs/package-lock.json
+
+# CDK outputs
+cdk/node_modules/
+cdk/*.js
+cdk/*.d.ts
+cdk/cdk.out/
+
 # ──────────────────────────────────────────────
 # Python (original template)
 # ──────────────────────────────────────────────
