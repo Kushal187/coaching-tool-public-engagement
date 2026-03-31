@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { MarkdownContent } from './ui/markdown-content';
+import { API } from '../api-config';
 import type { CaseStudy } from '../data/caseStudies';
 
 export function CaseStudyDetail() {
@@ -27,7 +28,7 @@ export function CaseStudyDetail() {
     setLoading(true);
     setFetchError(null);
 
-    fetch(`/api/case-studies?id=${encodeURIComponent(caseStudyId)}`)
+    fetch(`${API.caseStudies.url}?id=${encodeURIComponent(caseStudyId)}`)
       .then(async (res) => {
         if (!res.ok) throw new Error(`Not found (${res.status})`);
         return res.json();

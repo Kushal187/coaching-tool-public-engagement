@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router';
 import { Badge } from './ui/badge';
+import { API } from '../api-config';
 import type { CaseStudy } from '../data/caseStudies';
 
 const TOPIC_CATEGORIES: { label: string; keywords: string[] }[] = [
@@ -146,7 +147,7 @@ export function CaseStudies() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/case-studies');
+      const res = await fetch(API.caseStudies.url);
       if (!res.ok) throw new Error(`Failed to load case studies (${res.status})`);
       const data: CaseStudy[] = await res.json();
       allStudiesRef.current = data;
@@ -177,7 +178,7 @@ export function CaseStudies() {
 
     try {
       const res = await fetch(
-        `/api/case-studies?q=${encodeURIComponent(query.trim())}`,
+        `${API.caseStudies.url}?q=${encodeURIComponent(query.trim())}`,
         { signal: controller.signal },
       );
       if (!res.ok) throw new Error(`Search failed (${res.status})`);

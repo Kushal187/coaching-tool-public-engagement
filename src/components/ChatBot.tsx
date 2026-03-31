@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Upload, Paperclip, Loader2, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { API } from '../api-config';
 import { MarkdownContent } from './ui/markdown-content';
 
 type SourceDoc = {
@@ -28,10 +29,12 @@ async function fetchBotResponse(
   onError: (err: string) => void,
 ) {
   try {
-    const res = await fetch('/api/chatbot', {
+    const chatBody: Record<string, unknown> = { message: userMessage, conversation };
+    if (API.chatbot.route) chatBody._route = API.chatbot.route;
+    const res = await fetch(API.chatbot.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: userMessage, conversation }),
+      body: JSON.stringify(chatBody),
     });
 
     if (!res.ok) {

@@ -23,6 +23,7 @@ const {
 const MODEL = process.env.CHATBOT_MODEL || 'gpt-5.1';
 const MAX_ITERATIONS = 5;
 
+
 // ── Shared helpers ──────────────────────────────────────────
 
 function collectSourcesFromMessages(messages) {
@@ -338,7 +339,7 @@ export const handler = awslambda.streamifyResponse(
 
     try {
       const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
-      const routePath = event.path || event.resource || '';
+      const routePath = event.path || event.resource || event.rawPath || '';
 
       let result;
 
@@ -348,7 +349,7 @@ export const handler = awslambda.streamifyResponse(
         result = handleAdaptCaseStudy(body);
       } else {
         // Default: /api/chatbot
-        result = handleChatbot(body);
+        result = await handleChatbot(body);
       }
 
       if (result.error) {

@@ -18,14 +18,10 @@ if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
 // ── Secrets Manager helper (Lambda only) ───────────────────
 
 async function getSecret(secretId) {
-  const token = process.env.AWS_SESSION_TOKEN;
-  const resp = await fetch(
-    `http://localhost:2773/secretsmanager/get?secretId=${encodeURIComponent(secretId)}`,
-    { headers: { 'X-Aws-Parameters-Secrets-Token': token } },
-  );
-  if (!resp.ok) throw new Error(`Failed to get secret ${secretId}: ${resp.status}`);
-  const data = await resp.json();
-  return JSON.parse(data.SecretString);
+  const { SecretsManagerClient, GetSecretValueCommand } = await import('@aws-sdk/client-secrets-manager');
+  const client = new SecretsManagerClient({});
+  const result = await client.send(new GetSecretValueCommand({ SecretId: secretId }));
+  return JSON.parse(result.SecretString);
 }
 
 // ── Load credentials ───────────────────────────────────────

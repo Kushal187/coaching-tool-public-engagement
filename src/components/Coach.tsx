@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowRight, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
+import { API, postBody } from '../api-config';
 import { Button } from './ui/button';
 import {
   Dialog,
@@ -163,14 +164,10 @@ export function Coach() {
     setGenerationError(null);
 
     try {
-      const res = await fetch('/api/generate-scenario-responses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scenario: selectedScenario,
-          customDescription: selectedScenario === 'custom' ? customDescription : undefined,
-        }),
-      });
+      const res = await fetch(...postBody(API.generateScenarioResponses, {
+        scenario: selectedScenario,
+        customDescription: selectedScenario === 'custom' ? customDescription : undefined,
+      }));
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Request failed' }));
@@ -212,11 +209,7 @@ export function Coach() {
     sessionStorage.setItem('nestaResponses', JSON.stringify(responses));
 
     try {
-      const res = await fetch('/api/evaluate-assessment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ responses }),
-      });
+      const res = await fetch(...postBody(API.evaluateAssessment, { responses }));
 
       if (!res.ok) throw new Error('Evaluation failed');
 

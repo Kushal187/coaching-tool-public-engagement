@@ -14,6 +14,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.1020.0",
     "openai": "^6.33.0",
     "uuid": "^13.0.0",
     "weaviate-ts-client": "^2.2.0"

@@ -301,6 +301,17 @@ export class CoachingToolStack extends cdk.Stack {
     });
     chatbotStreamFn.addToRolePolicy(apiLambdaBasePolicy);
 
+    // Function URL for SSE streaming (API Gateway REST API doesn't support response streaming)
+    const chatbotFnUrl = chatbotStreamFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
+    });
+
+    new cdk.CfnOutput(this, 'ChatbotFunctionUrl', {
+      description: 'Lambda Function URL for chatbot streaming',
+      value: chatbotFnUrl.url,
+    });
+
     const agentJsonFn = new lambda.Function(this, 'AgentJsonFn', {
       functionName: 'coaching-tool-agent-json',
       runtime: lambda.Runtime.NODEJS_22_X,
@@ -314,6 +325,10 @@ export class CoachingToolStack extends cdk.Stack {
       tracing: lambda.Tracing.ACTIVE,
     });
     agentJsonFn.addToRolePolicy(apiLambdaBasePolicy);
+
+    const agentJsonFnUrl = agentJsonFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+    });
 
     const llmJsonFn = new lambda.Function(this, 'LlmJsonFn', {
       functionName: 'coaching-tool-llm-json',
@@ -329,6 +344,10 @@ export class CoachingToolStack extends cdk.Stack {
     });
     llmJsonFn.addToRolePolicy(apiLambdaBasePolicy);
 
+    const llmJsonFnUrl = llmJsonFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+    });
+
     const scoreCaseStudiesFn = new lambda.Function(this, 'ScoreCaseStudiesFn', {
       functionName: 'coaching-tool-score-case-studies',
       runtime: lambda.Runtime.NODEJS_22_X,
@@ -342,6 +361,10 @@ export class CoachingToolStack extends cdk.Stack {
       tracing: lambda.Tracing.ACTIVE,
     });
     scoreCaseStudiesFn.addToRolePolicy(apiLambdaBasePolicy);
+
+    const scoreCaseStudiesFnUrl = scoreCaseStudiesFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+    });
 
     // --- Non-LLM functions (120s timeout) ---
 
@@ -809,43 +832,37 @@ export class CoachingToolStack extends cdk.Stack {
       proxy: true,
     };
 
-    // --- Public API routes ---
+    // --- Public API routes (must match frontend fetch paths exactly) ---
     const apiResource = api.root.addResource('api');
+    const agentIntegration = new apigateway.LambdaIntegration(agentJsonFn, lambdaIntegrationOptions);
+    const llmIntegration = new apigateway.LambdaIntegration(llmJsonFn, lambdaIntegrationOptions);
 
-    // POST /api/chatbot (streaming enabled)
-    const chatbotResource = apiResource.addResource('chatbot');
-    chatbotResource.addMethod(
-      'POST',
-      new apigateway.LambdaIntegration(chatbotStreamFn, lambdaIntegrationOptions)
-    );
+    // POST /api/chatbot
+    apiResource.addResource('chatbot').addMethod('POST',
+      new apigateway.LambdaIntegration(chatbotStreamFn, lambdaIntegrationOptions));
 
-    // POST /api/agent
-    const agentResource = apiResource.addResource('agent');
-    agentResource.addMethod(
-      'POST',
-      new apigateway.LambdaIntegration(agentJsonFn, lambdaIntegrationOptions)
-    );
+    // POST /api/generate-questions
+    apiResource.addResource('generate-questions').addMethod('POST', agentIntegration);
 
-    // POST /api/llm
-    const llmResource = apiResource.addResource('llm');
-    llmResource.addMethod(
-      'POST',
-      new apigateway.LambdaIntegration(llmJsonFn, lambdaIntegrationOptions)
-    );
+    // POST /api/generate-scenario-responses
+    apiResource.addResource('generate-scenario-responses').addMethod('POST', agentIntegration);
+
+    // POST /api/evaluate-assessment
+    apiResource.addResource('evaluate-assessment').addMethod('POST', agentIntegration);
+
+    // POST /api/generate-reflection
+    apiResource.addResource('generate-reflection').addMethod('POST', agentIntegration);
+
+    // POST /api/analyze-cross-resolution
+    apiResource.addResource('analyze-cross-resolution').addMethod('POST', llmIntegration);
 
     // POST /api/score-case-studies
-    const scoreCaseStudiesResource = apiResource.addResource('score-case-studies');
-    scoreCaseStudiesResource.addMethod(
-      'POST',
-      new apigateway.LambdaIntegration(scoreCaseStudiesFn, lambdaIntegrationOptions)
-    );
+    apiResource.addResource('score-case-studies').addMethod('POST',
+      new apigateway.LambdaIntegration(scoreCaseStudiesFn, lambdaIntegrationOptions));
 
     // GET /api/case-studies
-    const caseStudiesResource = apiResource.addResource('case-studies');
-    caseStudiesResource.addMethod(
-      'GET',
-      new apigateway.LambdaIntegration(caseStudiesReadFn, lambdaIntegrationOptions)
-    );
+    apiResource.addResource('case-studies').addMethod('GET',
+      new apigateway.LambdaIntegration(caseStudiesReadFn, lambdaIntegrationOptions));
 
     // --- Admin routes (protected by Lambda authorizer) ---
     const adminResource = apiResource.addResource('admin');
@@ -853,84 +870,43 @@ export class CoachingToolStack extends cdk.Stack {
       authorizer: lambdaAuthorizer,
       authorizationType: apigateway.AuthorizationType.CUSTOM,
     };
+    const adminReadIntegration = new apigateway.LambdaIntegration(adminReadFn, lambdaIntegrationOptions);
+    const adminWriteIntegration = new apigateway.LambdaIntegration(adminWriteFn, lambdaIntegrationOptions);
 
-    // GET /api/admin/registry
+    // GET /api/admin/stats
+    adminResource.addResource('stats').addMethod('GET', adminReadIntegration, adminAuthOptions);
+
+    // /api/admin/documents and /api/admin/documents/{id}
+    const adminDocsResource = adminResource.addResource('documents');
+    adminDocsResource.addMethod('GET', adminReadIntegration, adminAuthOptions);
+    const adminDocIdResource = adminDocsResource.addResource('{id}');
+    adminDocIdResource.addMethod('GET', adminReadIntegration, adminAuthOptions);
+    adminDocIdResource.addMethod('DELETE', adminWriteIntegration, adminAuthOptions);
+
+    // /api/admin/registry
     const adminRegistryResource = adminResource.addResource('registry');
-    adminRegistryResource.addMethod(
-      'GET',
-      new apigateway.LambdaIntegration(adminReadFn, lambdaIntegrationOptions),
-      adminAuthOptions
-    );
+    adminRegistryResource.addMethod('GET', adminReadIntegration, adminAuthOptions);
+    adminRegistryResource.addMethod('POST', adminWriteIntegration, adminAuthOptions);
 
-    // GET /api/admin/registry/{id}
-    const adminRegistryIdResource = adminRegistryResource.addResource('{id}');
-    adminRegistryIdResource.addMethod(
-      'GET',
-      new apigateway.LambdaIntegration(adminReadFn, lambdaIntegrationOptions),
-      adminAuthOptions
-    );
+    // POST /api/admin/classify
+    adminResource.addResource('classify').addMethod('POST', llmIntegration, adminAuthOptions);
 
-    // POST /api/admin/registry
-    adminRegistryResource.addMethod(
-      'POST',
-      new apigateway.LambdaIntegration(adminWriteFn, lambdaIntegrationOptions),
-      adminAuthOptions
-    );
-
-    // PUT /api/admin/registry/{id}
-    adminRegistryIdResource.addMethod(
-      'PUT',
-      new apigateway.LambdaIntegration(adminWriteFn, lambdaIntegrationOptions),
-      adminAuthOptions
-    );
-
-    // DELETE /api/admin/registry/{id}
-    adminRegistryIdResource.addMethod(
-      'DELETE',
-      new apigateway.LambdaIntegration(adminWriteFn, lambdaIntegrationOptions),
-      adminAuthOptions
-    );
-
-    // POST /api/admin/ingest
+    // /api/admin/ingest, /api/admin/ingest/text, /api/admin/ingest/url, /api/admin/ingest/pdf/convert, /api/admin/ingest/pdf/confirm
     const adminIngestResource = adminResource.addResource('ingest');
-    adminIngestResource.addMethod(
-      'POST',
-      new apigateway.LambdaIntegration(adminIngestFn, lambdaIntegrationOptions),
-      adminAuthOptions
-    );
+    const adminIngestIntegration = new apigateway.LambdaIntegration(adminIngestFn, lambdaIntegrationOptions);
+    adminIngestResource.addResource('text').addMethod('POST', adminIngestIntegration, adminAuthOptions);
+    adminIngestResource.addResource('url').addMethod('POST', adminIngestIntegration, adminAuthOptions);
+    const adminIngestPdfResource = adminIngestResource.addResource('pdf');
+    adminIngestPdfResource.addResource('convert').addMethod('POST',
+      new apigateway.LambdaIntegration(pdfConvertFn, lambdaIntegrationOptions), adminAuthOptions);
+    adminIngestPdfResource.addResource('confirm').addMethod('POST', adminIngestIntegration, adminAuthOptions);
 
-    // POST /api/admin/pipeline/trigger
+    // /api/admin/pipeline/run and /api/admin/pipeline/status
     const adminPipelineResource = adminResource.addResource('pipeline');
-    const adminPipelineTriggerResource = adminPipelineResource.addResource('trigger');
-    adminPipelineTriggerResource.addMethod(
-      'POST',
-      new apigateway.LambdaIntegration(pipelineTriggerFn, lambdaIntegrationOptions),
-      adminAuthOptions
-    );
-
-    // GET /api/admin/pipeline/status
-    const adminPipelineStatusResource = adminPipelineResource.addResource('status');
-    adminPipelineStatusResource.addMethod(
-      'GET',
-      new apigateway.LambdaIntegration(pipelineStatusFn, lambdaIntegrationOptions),
-      adminAuthOptions
-    );
-
-    // GET /api/admin/pipeline/status/{runId}
-    const adminPipelineStatusIdResource = adminPipelineStatusResource.addResource('{runId}');
-    adminPipelineStatusIdResource.addMethod(
-      'GET',
-      new apigateway.LambdaIntegration(pipelineStatusFn, lambdaIntegrationOptions),
-      adminAuthOptions
-    );
-
-    // POST /api/admin/pdf-convert
-    const adminPdfConvertResource = adminResource.addResource('pdf-convert');
-    adminPdfConvertResource.addMethod(
-      'POST',
-      new apigateway.LambdaIntegration(pdfConvertFn, lambdaIntegrationOptions),
-      adminAuthOptions
-    );
+    adminPipelineResource.addResource('run').addMethod('POST',
+      new apigateway.LambdaIntegration(pipelineTriggerFn, lambdaIntegrationOptions), adminAuthOptions);
+    adminPipelineResource.addResource('status').addMethod('GET',
+      new apigateway.LambdaIntegration(pipelineStatusFn, lambdaIntegrationOptions), adminAuthOptions);
 
     // =========================================================================
     // 10. CLOUDFRONT DISTRIBUTION
@@ -955,6 +931,20 @@ export class CoachingToolStack extends cdk.Stack {
       }
     );
 
+    // Function URL origins for LLM endpoints (REST API has 29s hard timeout limit)
+    const fnUrlBehavior = (fnUrl: lambda.FunctionUrl) => {
+      const domain = cdk.Fn.select(2, cdk.Fn.split('/', fnUrl.url));
+      return {
+        origin: new origins.HttpOrigin(domain, {
+          readTimeout: cdk.Duration.seconds(120),
+        }),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      };
+    };
+
     const distribution = new cloudfront.Distribution(this, 'CoachingToolDistribution', {
       defaultBehavior: {
         origin: s3Origin,
@@ -962,6 +952,15 @@ export class CoachingToolStack extends cdk.Stack {
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
       },
       additionalBehaviors: {
+        // LLM endpoints -> Function URLs (bypass API Gateway 29s timeout)
+        '/api/chatbot': fnUrlBehavior(chatbotFnUrl),
+        '/api/generate-questions': fnUrlBehavior(agentJsonFnUrl),
+        '/api/generate-scenario-responses': fnUrlBehavior(agentJsonFnUrl),
+        '/api/evaluate-assessment': fnUrlBehavior(agentJsonFnUrl),
+        '/api/generate-reflection': fnUrlBehavior(agentJsonFnUrl),
+        '/api/analyze-cross-resolution': fnUrlBehavior(llmJsonFnUrl),
+        '/api/score-case-studies': fnUrlBehavior(scoreCaseStudiesFnUrl),
+        // All other /api/* routes -> API Gateway (admin, case-studies, etc.)
         '/api/*': {
           origin: apiOrigin,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,

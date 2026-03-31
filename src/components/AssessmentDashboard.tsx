@@ -12,6 +12,7 @@ import {
   type AssessmentCard,
   type CardStatus,
 } from './CoachingChatPanel';
+import { API, postBody } from '../api-config';
 import type { NestaResponses } from './Coach';
 
 const STATUS_GROUPS: { status: CardStatus; label: string; color: string }[] = [
@@ -65,11 +66,7 @@ export function AssessmentDashboard() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/evaluate-assessment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ responses: resp }),
-      });
+      const res = await fetch(...postBody(API.evaluateAssessment, { responses: resp }));
       if (!res.ok) throw new Error('Evaluation failed');
       const data = await res.json();
       setCards(data.evaluations);

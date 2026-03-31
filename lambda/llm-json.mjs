@@ -162,7 +162,7 @@ export const handler = async (event) => {
 
   try {
     const body = typeof event.body === 'string' ? JSON.parse(event.body) : (event.body || {});
-    const routePath = event.path || event.resource || event.rawPath || '';
+    const routePath = body._route || event.path || event.resource || event.rawPath || '';
 
     if (routePath.includes('/analyze-cross-resolution')) {
       return await handleCrossResolution(body);

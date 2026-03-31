@@ -15,6 +15,7 @@ import { Badge } from './ui/badge';
 import { MarkdownContent } from './ui/markdown-content';
 import type { AssessmentCard } from './CoachingChatPanel';
 import type { NestaResponses } from './Coach';
+import { API, postBody } from '../api-config';
 import type { CaseStudy } from '../data/caseStudies';
 
 interface ReflectionItem {
@@ -103,11 +104,7 @@ export function Reflection() {
       setResolvedWithoutChat(noChat);
       setResolvedInAssessment(fromAssessment);
 
-      const res = await fetch('/api/generate-reflection', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ responses, evaluations, chatHistories }),
-      });
+      const res = await fetch(...postBody(API.generateReflection, { responses, evaluations, chatHistories }));
 
       if (!res.ok) throw new Error('Reflection generation failed');
 
@@ -117,11 +114,7 @@ export function Reflection() {
       const hasResponses = Object.values(responses).some((v) => v && v.trim());
       if (hasResponses) {
         try {
-          const csRes = await fetch('/api/score-case-studies', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nestaResponses: responses }),
-          });
+          const csRes = await fetch(...postBody(API.scoreCaseStudies, { nestaResponses: responses }));
           if (csRes.ok) {
             const csData = await csRes.json();
             const scored: CaseStudy[] = csData.scoredCaseStudies ?? [];

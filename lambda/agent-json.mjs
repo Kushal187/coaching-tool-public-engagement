@@ -21,7 +21,7 @@ const {
 } = await import(`${LIB_PATH}/prompts/load.mjs`);
 
 const MODEL = process.env.CHATBOT_MODEL || 'gpt-5.1';
-const MAX_ITERATIONS = 5;
+const MAX_ITERATIONS = 3;
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -363,7 +363,7 @@ export const handler = async (event) => {
 
   try {
     const body = typeof event.body === 'string' ? JSON.parse(event.body) : (event.body || {});
-    const routePath = event.path || event.resource || event.rawPath || '';
+    const routePath = body._route || event.path || event.resource || event.rawPath || '';
 
     if (routePath.includes('/generate-questions')) {
       return await handleGenerateQuestions(body);

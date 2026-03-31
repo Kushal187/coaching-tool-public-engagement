@@ -6,6 +6,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { MarkdownContent } from './ui/markdown-content';
+import { API, postBody } from '../api-config';
 import coachingTemplate from '../../prompts/coaching-context.txt?raw';
 
 export type CardStatus = 'addressed' | 'partial' | 'not-addressed';
@@ -132,10 +133,12 @@ export function CoachingChatPanel({
     try {
       const conversation = buildConversation(newMessages);
 
-      const res = await fetch('/api/chatbot', {
+      const chatBody: Record<string, unknown> = { message: text, conversation };
+      if (API.chatbot.route) chatBody._route = API.chatbot.route;
+      const res = await fetch(API.chatbot.url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, conversation }),
+        body: JSON.stringify(chatBody),
       });
 
       if (!res.ok) throw new Error('Chat request failed');
@@ -188,16 +191,12 @@ export function CoachingChatPanel({
         .filter((m) => m.role === 'user' || m.role === 'ai')
         .map((m) => ({ role: m.role === 'ai' ? 'coach' : 'user', content: m.content }));
 
-      const res = await fetch('/api/analyze-cross-resolution', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversation: conversationForAnalysis,
-          currentQuestionId: card.questionId,
-          currentQuestion: { question: card.question, gap: card.gap },
-          unresolvedCards,
-        }),
-      });
+      const res = await fetch(...postBody(API.analyzeCrossResolution, {
+        conversation: conversationForAnalysis,
+        currentQuestionId: card.questionId,
+        currentQuestion: { question: card.question, gap: card.gap },
+        unresolvedCards,
+      }));
 
       if (!res.ok) return;
 
