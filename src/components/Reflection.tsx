@@ -1,22 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import {
   Download,
   ChevronLeft,
   Loader2,
   RefreshCw,
-  BookOpen,
-  MapPin,
-  ArrowRight,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import { MarkdownContent } from './ui/markdown-content';
-import type { AssessmentCard } from './CoachingChatPanel';
-import type { NestaResponses } from './Coach';
 import { API, postBody } from '../api-config';
-import type { CaseStudy } from '../data/caseStudies';
 
 interface ReflectionItem {
   questionId: number;
@@ -42,116 +35,33 @@ interface ReflectionData {
 export function Reflection() {
   const navigate = useNavigate();
   const location = useLocation();
-  // sessionId is passed from UnifiedChat when using the new session-based flow
   const chatSessionId = (location.state as { sessionId?: string })?.sessionId;
 
   const [reflection, setReflection] = useState<ReflectionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [resolvedWithoutChat, setResolvedWithoutChat] = useState<Set<number>>(new Set());
-  const [resolvedViaCrossChat, setResolvedViaCrossChat] = useState<Set<number>>(new Set());
-  const [resolvedInAssessment, setResolvedInAssessment] = useState<Set<number>>(new Set());
-  const [suggestedCaseStudies, setSuggestedCaseStudies] = useState<CaseStudy[]>([]);
 
   const fetchReflection = async () => {
-    setLoading(true);
-    setError('');
-
-    // New session-based flow: fetch reflection from /api/chat/reflection
-    if (chatSessionId) {
-      try {
-        const res = await fetch(...postBody(API.chatReflection, { sessionId: chatSessionId }));
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => null);
-          throw new Error(errData?.error || 'Reflection generation failed');
-        }
-
-        const data = await res.json();
-        setReflection(data.reflection);
-      } catch (err) {
-        console.error('Failed to generate session reflection:', err);
-        setError('Failed to generate your reflection. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    // Legacy flow: read from sessionStorage
-    const savedResponses = sessionStorage.getItem('nestaResponses');
-    const savedEvaluations = sessionStorage.getItem('nestaEvaluations');
-
-    if (!savedResponses || !savedEvaluations) {
+    if (!chatSessionId) {
       navigate('/coach');
       return;
     }
 
+    setLoading(true);
+    setError('');
+
     try {
-      const responses: NestaResponses = JSON.parse(savedResponses);
-      const evaluations: AssessmentCard[] = JSON.parse(savedEvaluations);
+      const res = await fetch(...postBody(API.chatReflection, { sessionId: chatSessionId }));
 
-      const chatHistories: Record<number, { role: string; content: string }[]> = {};
-      for (let i = 1; i <= 9; i++) {
-        const saved = sessionStorage.getItem(`nestaChat_${i}`);
-        if (saved) {
-          try { chatHistories[i] = JSON.parse(saved); } catch { /* skip */ }
-        }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || 'Reflection generation failed');
       }
-
-      let crossResolved = new Set<number>();
-      try {
-        const saved = sessionStorage.getItem('nestaCrossResolved');
-        if (saved) crossResolved = new Set(JSON.parse(saved));
-      } catch { /* ignore */ }
-      setResolvedViaCrossChat(crossResolved);
-
-      let initiallyAddressed = new Set<number>();
-      try {
-        const saved = sessionStorage.getItem('nestaInitiallyAddressed');
-        if (saved) initiallyAddressed = new Set(JSON.parse(saved));
-      } catch { /* ignore */ }
-
-      const noChat = new Set<number>();
-      const fromAssessment = new Set<number>();
-      for (const ev of evaluations) {
-        if (ev.status === 'addressed') {
-          const chat = chatHistories[ev.questionId];
-          const userMsgs = chat?.filter((m) => m.role === 'user') || [];
-          if (userMsgs.length === 0 && !crossResolved.has(ev.questionId)) {
-            if (initiallyAddressed.has(ev.questionId)) {
-              fromAssessment.add(ev.questionId);
-            } else {
-              noChat.add(ev.questionId);
-            }
-          }
-        }
-      }
-      setResolvedWithoutChat(noChat);
-      setResolvedInAssessment(fromAssessment);
-
-      const res = await fetch(...postBody(API.generateReflection, { responses, evaluations, chatHistories }));
-
-      if (!res.ok) throw new Error('Reflection generation failed');
 
       const data = await res.json();
       setReflection(data.reflection);
-
-      const hasResponses = Object.values(responses).some((v) => v && v.trim());
-      if (hasResponses) {
-        try {
-          const csRes = await fetch(...postBody(API.scoreCaseStudies, { nestaResponses: responses }));
-          if (csRes.ok) {
-            const csData = await csRes.json();
-            const scored: CaseStudy[] = csData.scoredCaseStudies ?? [];
-            setSuggestedCaseStudies(scored.slice(0, 5));
-          }
-        } catch {
-          /* non-critical */
-        }
-      }
     } catch (err) {
-      console.error('Failed to generate reflection:', err);
+      console.error('Failed to generate session reflection:', err);
       setError('Failed to generate your reflection. Please try again.');
     } finally {
       setLoading(false);
@@ -280,7 +190,6 @@ export function Reflection() {
       items: ReflectionItem[],
       color: [number, number, number],
       showNextSteps: boolean,
-      highlightNoChat = false,
     ) => {
       if (items.length === 0) return;
       checkPage(20);
@@ -296,16 +205,6 @@ export function Reflection() {
 
       items.forEach((item, i) => {
         checkPage(14);
-        if (highlightNoChat && resolvedWithoutChat.has(item.questionId)) {
-          writeWrapped('Resolved without coaching conversation', 9, [80, 80, 80], 'normal');
-          y += 2;
-        } else if (highlightNoChat && resolvedViaCrossChat.has(item.questionId)) {
-          writeWrapped('Resolved through a different conversation', 9, [80, 80, 80], 'normal');
-          y += 2;
-        } else if (highlightNoChat && resolvedInAssessment.has(item.questionId)) {
-          writeWrapped('Resolved in the Coaching Assessment', 9, [80, 80, 80], 'normal');
-          y += 2;
-        }
         writeWrapped(
           `${i + 1}. ${item.question}`,
           11,
@@ -331,7 +230,6 @@ export function Reflection() {
       reflection.addressed,
       [9, 114, 97],
       false,
-      true,
     );
     renderSection(
       'Areas to Develop -- What\'s Underdeveloped',
@@ -366,50 +264,6 @@ export function Reflection() {
         writeWrapped(pa.rationale, 10);
         y += 1;
         writeWrapped(`Timeline: ${pa.timeline}`, 10, [18, 77, 143], 'bold', 4);
-        y += 6;
-      });
-    }
-
-    // ── Suggested Case Studies ──
-    if (suggestedCaseStudies.length > 0) {
-      checkPage(20);
-      doc.setFontSize(16);
-      doc.setTextColor(18, 77, 143);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Suggested Case Studies', margin, y);
-      y += 3;
-      doc.setDrawColor(18, 77, 143);
-      doc.setLineWidth(0.5);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 8;
-
-      writeWrapped(
-        'Real-world examples relevant to your engagement project:',
-        10,
-        [80, 80, 80],
-      );
-      y += 4;
-
-      suggestedCaseStudies.forEach((cs, i) => {
-        checkPage(28);
-        const scoreLabel = cs.relevancyScore != null ? ` (${cs.relevancyScore}% match)` : '';
-        writeWrapped(`${i + 1}. ${cs.title}${scoreLabel}`, 11, [30, 30, 30], 'bold');
-        y += 1;
-        writeWrapped(
-          `Location: ${cs.location} | Scale: ${cs.scale}`,
-          9,
-          [100, 100, 100],
-        );
-        y += 1;
-        if (cs.tags.length > 0) {
-          writeWrapped(`Tags: ${cs.tags.join(', ')}`, 9, [100, 100, 100]);
-          y += 1;
-        }
-        writeWrapped(cs.summary, 10);
-        if (cs.relevancyReason) {
-          y += 1;
-          writeWrapped(`Relevancy: ${cs.relevancyReason}`, 9, [100, 100, 100], 'normal', 4);
-        }
         y += 6;
       });
     }
@@ -504,40 +358,11 @@ export function Reflection() {
               </p>
             </div>
             <div className="space-y-5">
-              {reflection.addressed.map((item) => {
-                const isCrossResolved = resolvedViaCrossChat.has(item.questionId);
-                const isNoChat = resolvedWithoutChat.has(item.questionId);
-                const isFromAssessment = resolvedInAssessment.has(item.questionId);
-
-                return (
+              {reflection.addressed.map((item) => (
                 <div
                   key={item.questionId}
                   className="rounded-lg p-5 bg-white border border-gray-200"
                 >
-                  {isNoChat && (
-                    <div
-                      className="mb-3 rounded-r-md border-l-4 border-gray-500 bg-gray-100 px-3 py-2 text-sm font-medium text-gray-800"
-                      role="status"
-                    >
-                      Resolved without coaching conversation
-                    </div>
-                  )}
-                  {isCrossResolved && !isNoChat && (
-                    <div
-                      className="mb-3 rounded-r-md border-l-4 border-gray-500 bg-gray-100 px-3 py-2 text-sm font-medium text-gray-800"
-                      role="status"
-                    >
-                      Resolved through a different conversation
-                    </div>
-                  )}
-                  {isFromAssessment && (
-                    <div
-                      className="mb-3 rounded-r-md border-l-4 border-gray-500 bg-gray-100 px-3 py-2 text-sm font-medium text-gray-800"
-                      role="status"
-                    >
-                      Resolved in the Coaching Assessment
-                    </div>
-                  )}
                   <h3 className="font-semibold text-gray-800 mb-2">
                     {item.questionId}. {item.question}
                   </h3>
@@ -545,8 +370,7 @@ export function Reflection() {
                     <MarkdownContent compact>{item.analysis}</MarkdownContent>
                   </div>
                 </div>
-                );
-              })}
+              ))}
             </div>
           </div>
         )}
@@ -694,81 +518,6 @@ export function Reflection() {
         </div>
       )}
 
-      {/* Suggested Case Studies */}
-      {suggestedCaseStudies.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-8 mb-8">
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-1">
-              <BookOpen className="w-5 h-5 text-[#124D8F]" />
-              <h2
-                className="text-2xl text-[#124D8F]"
-                style={{ fontFamily: "'DM Serif Display', serif" }}
-              >
-                Suggested Case Studies
-              </h2>
-            </div>
-            <p className="text-gray-500 text-sm">
-              Real-world examples relevant to your engagement project
-            </p>
-          </div>
-          <div className="space-y-4">
-            {suggestedCaseStudies.map((cs) => (
-              <Link
-                key={cs.id}
-                to={`/case-studies/${cs.id}`}
-                className="block border border-gray-200 rounded-lg p-5 hover:shadow-md hover:border-[#124D8F]/30 transition-all group"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-[#124D8F] group-hover:underline">
-                        {cs.title}
-                      </h3>
-                      {cs.relevancyScore != null && (
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
-                            cs.relevancyScore >= 70
-                              ? 'bg-green-100 text-green-800'
-                              : cs.relevancyScore >= 50
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-gray-100 text-gray-700'
-                          }`}
-                        >
-                          {cs.relevancyScore}% match
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
-                      <span className="inline-flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        {cs.location}
-                      </span>
-                      <span className="capitalize">{cs.scale} scale</span>
-                    </div>
-                    <p className="text-sm text-gray-600 line-clamp-2">
-                      {cs.summary}
-                    </p>
-                    {cs.relevancyReason && (
-                      <p className="text-xs text-gray-400 mt-1.5 italic line-clamp-2">
-                        {cs.relevancyReason}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {cs.tags.slice(0, 4).map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-[#124D8F] flex-shrink-0 mt-1 transition-colors" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Actions */}
       <div className="flex gap-4 justify-center pb-8">
         <Button type="button" onClick={handleDownload} className="px-8 py-3">
@@ -778,11 +527,11 @@ export function Reflection() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => navigate(chatSessionId ? '/coach' : '/coach/dashboard')}
+          onClick={() => navigate('/coach')}
           className="px-8 py-3"
         >
           <ChevronLeft className="w-5 h-5" />
-          {chatSessionId ? 'Back to Chat' : 'Back to Dashboard'}
+          Back to Chat
         </Button>
       </div>
     </div>

@@ -1,7 +1,6 @@
 // lambda/agent-json.mjs
 // Non-streaming agent loop handler for:
 //   POST /api/generate-questions
-//   POST /api/generate-scenario-responses
 //   POST /api/evaluate-assessment
 //   POST /api/generate-reflection
 
@@ -14,8 +13,6 @@ const {
 } = await import(`${LIB_PATH}/lib/agent-tools.mjs`);
 const {
   GENERATE_QUESTIONS_PROMPT,
-  GENERATE_SCENARIO_PROMPT,
-  SCENARIO_DESCRIPTIONS,
   EVALUATE_ASSESSMENT_PROMPT,
   GENERATE_REFLECTION_PROMPT,
 } = await import(`${LIB_PATH}/prompts/load.mjs`);
@@ -147,68 +144,6 @@ async function handleGenerateQuestions(body) {
   } catch (error) {
     console.error('Error generating follow-up questions:', error);
     return jsonResponse({ needsFollowUp: false, questions: [] });
-  }
-}
-
-// ── /api/generate-scenario-responses ────────────────────────
-
-async function handleGenerateScenarioResponses(body) {
-  const { scenario, customDescription } = body;
-
-  if (!scenario) {
-    return errorResponse(400, 'Missing required field: scenario.');
-  }
-
-  const description = scenario === 'custom'
-    ? customDescription
-    : SCENARIO_DESCRIPTIONS[scenario];
-
-  if (!description) {
-    return errorResponse(400, 'Invalid scenario or missing custom description.');
-  }
-
-  try {
-    const questionsContext = NESTA_QUESTIONS
-      .map((q) => `Question ${q.id}: ${q.question}`)
-      .join('\n');
-
-    const userMessage = [
-      `Generate realistic practitioner responses for the following scenario:`,
-      ``,
-      `## Scenario`,
-      description,
-      ``,
-      `## Questions to Answer`,
-      questionsContext,
-      ``,
-      `Search the knowledge base for relevant engagement contexts to make the responses feel authentic, then generate the 9 responses in the required JSON format.`,
-    ].join('\n');
-
-    const result = await runAgentLoop({
-      systemPrompt: GENERATE_SCENARIO_PROMPT,
-      userMessage,
-      tools: agentToolDefinitions,
-      toolImpls: agentToolImplementations,
-      model: MODEL,
-      maxIterations: MAX_ITERATIONS,
-    });
-
-    let parsed;
-    try {
-      parsed = JSON.parse(cleanJsonResponse(result));
-    } catch {
-      console.error('Failed to parse scenario response as JSON:', result);
-      return errorResponse(500, 'Failed to parse generated responses.');
-    }
-
-    if (!parsed.responses || typeof parsed.responses !== 'object') {
-      return errorResponse(500, 'Invalid response format.');
-    }
-
-    return jsonResponse(parsed);
-  } catch (error) {
-    console.error('Error generating scenario responses:', error);
-    return errorResponse(500, 'Failed to generate scenario responses.');
   }
 }
 
@@ -367,9 +302,6 @@ export const handler = async (event) => {
 
     if (routePath.includes('/generate-questions')) {
       return await handleGenerateQuestions(body);
-    }
-    if (routePath.includes('/generate-scenario-responses')) {
-      return await handleGenerateScenarioResponses(body);
     }
     if (routePath.includes('/evaluate-assessment')) {
       return await handleEvaluateAssessment(body);

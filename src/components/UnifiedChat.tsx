@@ -35,6 +35,33 @@ type Message = {
   isStreaming?: boolean;
 };
 
+// ── Session persistence ───────────────────────────────────
+
+const CHAT_STORAGE_KEY = 'coach-chat-state';
+
+type ChatPersistedState = {
+  sessionId: string;
+  messages: Message[];
+  lastMetadata: MessageMetadata | null;
+};
+
+function saveChatState(state: ChatPersistedState) {
+  sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(state));
+}
+
+function loadChatState(): ChatPersistedState | null {
+  try {
+    const raw = sessionStorage.getItem(CHAT_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearChatState() {
+  sessionStorage.removeItem(CHAT_STORAGE_KEY);
+}
+
 // ── SSE fetch helper ───────────────────────────────────────
 
 async function fetchChatSSE(
@@ -96,10 +123,18 @@ export function UnifiedChat() {
   const navigate = useNavigate();
   const initialMessage = (location.state as { initialMessage?: string })?.initialMessage;
 
-  const [sessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const saved = !initialMessage ? loadChatState() : null;
+
+  const [sessionId] = useState(() => {
+    if (initialMessage) {
+      clearChatState();
+      return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+    return saved?.sessionId ?? `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  });
+
   const initialBotId = `bot-initial-${Date.now()}`;
 
-  // If there's an initial message from Home, start with it already visible
   const [messages, setMessages] = useState<Message[]>(() => {
     if (initialMessage) {
       return [
@@ -108,11 +143,11 @@ export function UnifiedChat() {
         { id: initialBotId, role: 'assistant', content: '', isStreaming: true },
       ];
     }
-    return [WELCOME_MESSAGE];
+    return saved?.messages ?? [WELCOME_MESSAGE];
   });
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(!!initialMessage);
-  const [lastMetadata, setLastMetadata] = useState<MessageMetadata | null>(null);
+  const [lastMetadata, setLastMetadata] = useState<MessageMetadata | null>(saved?.lastMetadata ?? null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const initialFired = useRef(false);
@@ -121,6 +156,14 @@ export function UnifiedChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Persist chat state to sessionStorage (only when not mid-stream)
+  useEffect(() => {
+    const hasStreaming = messages.some(m => m.isStreaming);
+    if (!hasStreaming) {
+      saveChatState({ sessionId, messages, lastMetadata });
+    }
+  }, [sessionId, messages, lastMetadata]);
 
   // Auto-focus input
   useEffect(() => {

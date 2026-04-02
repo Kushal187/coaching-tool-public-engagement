@@ -5,9 +5,15 @@ import { MemoryRouter } from 'react-router';
 import { Reflection } from '../Reflection';
 
 const mockNavigate = vi.fn();
+let mockLocationState: Record<string, unknown> = {};
+
 vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router');
-  return { ...actual, useNavigate: () => mockNavigate };
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+    useLocation: () => ({ state: mockLocationState, pathname: '/coach/reflection', search: '', hash: '', key: 'default' }),
+  };
 });
 
 vi.mock('../ui/markdown-content', () => ({
@@ -33,14 +39,6 @@ vi.mock('jspdf', () => ({
     save: vi.fn(),
   })),
 }));
-
-const MOCK_RESPONSES = { 1: 'Goal', 2: 'Participants', 3: 'Reach', 4: 'Owner', 5: 'Incentives', 6: 'Tasks', 7: 'Workflow', 8: 'Evaluate', 9: 'Use' };
-
-const MOCK_EVALUATIONS = [
-  { questionId: 1, question: 'Goals?', status: 'addressed', gap: null },
-  { questionId: 2, question: 'Participants?', status: 'partial', gap: 'Need more' },
-  { questionId: 3, question: 'Reach?', status: 'not-addressed', gap: 'Missing' },
-];
 
 const MOCK_REFLECTION = {
   summary: 'Overall you have a solid foundation.',
@@ -69,19 +67,18 @@ function renderReflection() {
 beforeEach(() => {
   vi.restoreAllMocks();
   mockNavigate.mockClear();
-  sessionStorage.clear();
+  mockLocationState = {};
   global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
 });
 
 describe('Reflection', () => {
-  it('redirects to /coach when no session data exists', () => {
+  it('redirects to /coach when no sessionId exists', () => {
     renderReflection();
     expect(mockNavigate).toHaveBeenCalledWith('/coach');
   });
 
   it('shows loading state while generating', () => {
-    sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
-    sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
+    mockLocationState = { sessionId: 'test-session-123' };
     global.fetch = vi.fn().mockImplementation(() => new Promise(() => {}));
 
     renderReflection();
@@ -89,8 +86,7 @@ describe('Reflection', () => {
   });
 
   it('renders reflection content after API success', async () => {
-    sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
-    sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
+    mockLocationState = { sessionId: 'test-session-123' };
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -111,8 +107,7 @@ describe('Reflection', () => {
   });
 
   it('renders reflection items with their analysis', async () => {
-    sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
-    sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
+    mockLocationState = { sessionId: 'test-session-123' };
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -129,8 +124,7 @@ describe('Reflection', () => {
   });
 
   it('renders next steps for partial and not-addressed items', async () => {
-    sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
-    sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
+    mockLocationState = { sessionId: 'test-session-123' };
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -147,8 +141,7 @@ describe('Reflection', () => {
   });
 
   it('renders priority actions with timelines', async () => {
-    sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
-    sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
+    mockLocationState = { sessionId: 'test-session-123' };
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -165,10 +158,13 @@ describe('Reflection', () => {
   });
 
   it('shows error state with retry on API failure', async () => {
-    sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
-    sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
+    mockLocationState = { sessionId: 'test-session-123' };
 
-    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: 'Server error' }),
+    });
 
     renderReflection();
 
@@ -178,9 +174,8 @@ describe('Reflection', () => {
     expect(screen.getByRole('button', { name: /Try Again/i })).toBeInTheDocument();
   });
 
-  it('renders Download Reflection and Back to Dashboard buttons', async () => {
-    sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
-    sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
+  it('renders Download Reflection and Back to Chat buttons', async () => {
+    mockLocationState = { sessionId: 'test-session-123' };
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -194,13 +189,12 @@ describe('Reflection', () => {
     });
 
     expect(screen.getByRole('button', { name: /Download Reflection/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Back to Dashboard/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Back to Chat/i })).toBeInTheDocument();
   });
 
-  it('navigates to dashboard when Back to Dashboard is clicked', async () => {
+  it('navigates to /coach when Back to Chat is clicked', async () => {
     const user = userEvent.setup();
-    sessionStorage.setItem('nestaResponses', JSON.stringify(MOCK_RESPONSES));
-    sessionStorage.setItem('nestaEvaluations', JSON.stringify(MOCK_EVALUATIONS));
+    mockLocationState = { sessionId: 'test-session-123' };
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -213,7 +207,7 @@ describe('Reflection', () => {
       expect(screen.getByText('Your Reflection')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /Back to Dashboard/i }));
-    expect(mockNavigate).toHaveBeenCalledWith('/coach/dashboard');
+    await user.click(screen.getByRole('button', { name: /Back to Chat/i }));
+    expect(mockNavigate).toHaveBeenCalledWith('/coach');
   });
 });

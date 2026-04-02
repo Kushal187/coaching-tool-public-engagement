@@ -1,9 +1,0 @@
-{
-  "well-prepared": "A well-prepared practitioner who has thoroughly planned their public engagement project. They have clear goals, identified stakeholders, established workflows, and thought through evaluation. Their responses should be detailed, specific, and actionable.",
-  "vague-minimal": "A practitioner who gives vague, minimal-effort responses. They use generic language, avoid specifics, and seem to be going through the motions without deep thought. Responses should be 1-2 sentences of non-specific filler.",
-  "contradictory": "A practitioner whose responses contain internal contradictions. For example, they might claim broad inclusivity in one answer but describe a narrow recruitment strategy in another, or set an ambitious timeline while describing limited resources. The contradictions should be subtle and realistic.",
-  "off-topic": "A practitioner who frequently misunderstands or goes off-topic. They might confuse public engagement with marketing, conflate consultation with co-design, or answer a different question than what was asked. Their confusion should be realistic.",
-  "over-ambitious": "A practitioner with wildly over-ambitious plans relative to their resources. They describe wanting to engage thousands of people across multiple demographics with complex deliberative processes, but hint at having minimal budget, a short timeline, and a small team.",
-  "hostile-resistant": "A practitioner who is skeptical or resistant to the engagement process. They express doubt about whether public engagement is worthwhile, question the methodology, give dismissive responses, or indicate they are being forced to do this by management/regulations.",
-  "custom": null
-}

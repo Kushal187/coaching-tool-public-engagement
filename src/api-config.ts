@@ -24,7 +24,6 @@ function llmEndpoint(fnUrl: string, route: string, fallbackPath: string): Endpoi
 export const API = {
   chatbot: llmEndpoint(CHATBOT_URL, '/api/chatbot', '/api/chatbot'),
   generateQuestions: llmEndpoint(AGENT_JSON_URL, '/api/generate-questions', '/api/generate-questions'),
-  generateScenarioResponses: llmEndpoint(AGENT_JSON_URL, '/api/generate-scenario-responses', '/api/generate-scenario-responses'),
   evaluateAssessment: llmEndpoint(AGENT_JSON_URL, '/api/evaluate-assessment', '/api/evaluate-assessment'),
   generateReflection: llmEndpoint(AGENT_JSON_URL, '/api/generate-reflection', '/api/generate-reflection'),
   analyzeCrossResolution: llmEndpoint(LLM_JSON_URL, '/api/analyze-cross-resolution', '/api/analyze-cross-resolution'),

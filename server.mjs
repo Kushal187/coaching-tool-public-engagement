@@ -22,8 +22,6 @@ import {
   ADAPT_CASE_STUDY_PROMPT,
   EVALUATE_COACHING_PROMPT,
   CROSS_RESOLUTION_PROMPT,
-  GENERATE_SCENARIO_PROMPT,
-  SCENARIO_DESCRIPTIONS,
   EVALUATE_ASSESSMENT_PROMPT,
   GENERATE_REFLECTION_PROMPT,
   SCORE_CASE_STUDIES_PROMPT,
@@ -474,69 +472,6 @@ app.post('/api/generate-questions', async (req, res) => {
   } catch (error) {
     console.error('Error generating follow-up questions:', error);
     res.json({ needsFollowUp: false, questions: [] });
-  }
-});
-
-// ── POST /api/generate-scenario-responses ───────────────────
-
-app.post('/api/generate-scenario-responses', async (req, res) => {
-  const { scenario, customDescription } = req.body;
-
-  if (!scenario) {
-    return res.status(400).json({ error: 'Missing required field: scenario.' });
-  }
-
-  const description = scenario === 'custom'
-    ? customDescription
-    : SCENARIO_DESCRIPTIONS[scenario];
-
-  if (!description) {
-    return res.status(400).json({ error: 'Invalid scenario or missing custom description.' });
-  }
-
-  try {
-    const questionsContext = NESTA_QUESTIONS
-      .map((q) => `Question ${q.id}: ${q.question}`)
-      .join('\n');
-
-    const userMessage = [
-      `Generate realistic practitioner responses for the following scenario:`,
-      ``,
-      `## Scenario`,
-      description,
-      ``,
-      `## Questions to Answer`,
-      questionsContext,
-      ``,
-      `Search the knowledge base for relevant engagement contexts to make the responses feel authentic, then generate the 9 responses in the required JSON format.`,
-    ].join('\n');
-
-    const result = await runAgentLoop({
-      systemPrompt: GENERATE_SCENARIO_PROMPT,
-      userMessage,
-      tools: agentToolDefinitions,
-      toolImpls: agentToolImplementations,
-      model: MODEL,
-      maxIterations: MAX_ITERATIONS,
-    });
-
-    let parsed;
-    try {
-      const cleaned = result.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-      parsed = JSON.parse(cleaned);
-    } catch {
-      console.error('Failed to parse scenario response as JSON:', result);
-      return res.status(500).json({ error: 'Failed to parse generated responses.' });
-    }
-
-    if (!parsed.responses || typeof parsed.responses !== 'object') {
-      return res.status(500).json({ error: 'Invalid response format.' });
-    }
-
-    res.json(parsed);
-  } catch (error) {
-    console.error('Error generating scenario responses:', error);
-    res.status(500).json({ error: 'Failed to generate scenario responses.' });
   }
 });
 
