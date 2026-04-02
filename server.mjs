@@ -28,6 +28,11 @@ import {
   GENERATE_REFLECTION_PROMPT,
   SCORE_CASE_STUDIES_PROMPT,
 } from './prompts/load.mjs';
+import { routeMessage } from './lib/orchestrator.mjs';
+import { getOrCreateSession, getSession, deleteSession, getSessionSummary } from './lib/session-state.mjs';
+import { coachResponse } from './lib/coach-agent.mjs';
+import { retrievalResponse } from './lib/retrieval-agent.mjs';
+import { handleSuggestNext } from './lib/suggest-next.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -1056,6 +1061,333 @@ app.get('/api/case-studies', async (req, res) => {
   } catch (error) {
     console.error('case-studies error:', error);
     res.status(500).json({ error: 'Failed to fetch case studies.' });
+  }
+});
+
+// ── POST /api/chat ─────────────────────────────────────────
+// Unified chat endpoint. Single entry point for the conversational
+// coaching interface. Manages sessions, routes via orchestrator,
+// dispatches to coach/retrieval/suggest/general agents, and streams
+// responses back via SSE.
+
+app.post('/api/chat', async (req, res) => {
+  const { sessionId, message } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: 'Missing "message" in request body.' });
+  }
+
+  const sid = sessionId || `auto-${Date.now()}`;
+  const session = getOrCreateSession(sid);
+
+  try {
+    // 1. Route the message via the orchestrator
+    const routing = await routeMessage(message, session);
+
+    // 2. Record user message in conversation history
+    session.conversationHistory.push({
+      role: 'user',
+      content: message,
+      metadata: { routing: routing.decision },
+    });
+
+    // 3. Dispatch to the appropriate handler
+    let result;
+
+    switch (routing.handler) {
+      case 'coach': {
+        const qId = routing.questionId || session.activeQuestionId || 1;
+        session.activeQuestionId = qId;
+        result = await coachResponse(qId, message, session);
+
+        // Auto-trigger suggestions when a question is resolved
+        if (result.resolved) {
+          try {
+            const suggestResult = await handleSuggestNext(session, qId);
+            // Append suggestion text to the coach's affirmation message
+            result.message = result.message + '\n\n---\n\n' + suggestResult.message;
+            result.suggestions = suggestResult.suggestions;
+            console.log(`[chat] Auto-suggesting next questions after Q${qId} resolved`);
+          } catch (err) {
+            console.error('[chat] Failed to auto-suggest after resolution:', err.message);
+            // Non-fatal: the coach's resolution message still goes through
+          }
+        }
+        break;
+      }
+
+      case 'retrieval': {
+        result = await retrievalResponse(message, session);
+        break;
+      }
+
+      case 'suggest': {
+        result = await handleSuggestNext(session);
+        break;
+      }
+
+      case 'general':
+      default: {
+        result = await handleGeneralMessage(message, session);
+        break;
+      }
+    }
+
+    // 4. Record assistant message in conversation history
+    session.conversationHistory.push({
+      role: 'assistant',
+      content: result.message,
+      metadata: {
+        handler: routing.handler,
+        questionId: routing.questionId,
+        resolved: result.resolved || false,
+      },
+    });
+
+    // 5. Stream response via SSE
+    initSSE(res);
+    res.write(formatSSEChunk(result.message));
+
+    // Include metadata so the frontend knows what happened
+    res.write(`data: ${JSON.stringify({
+      metadata: {
+        sessionId: sid,
+        handler: routing.handler,
+        questionId: routing.questionId,
+        resolved: result.resolved || false,
+        suggestions: result.suggestions || null,
+        sessionSummary: getSessionSummary(session),
+      },
+    })}\n\n`);
+
+    res.write(formatSSEDone());
+    res.end();
+
+    console.log(`[chat] ${sid} | ${routing.handler}(Q${routing.questionId ?? '-'}) | ${message.slice(0, 50)}...`);
+  } catch (error) {
+    console.error('[chat] Error:', error);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'An error occurred processing your message.' });
+    }
+    res.end();
+  }
+});
+
+// ── /api/chat handler: general messages ────────────────────
+
+async function handleGeneralMessage(message, session) {
+  const summary = getSessionSummary(session);
+
+  // For greetings when no questions are started, give the welcome nudge
+  const isNewSession = summary.addressedCount === 0 && summary.inProgressCount === 0;
+
+  const systemContent = [
+    'You are a friendly public engagement coaching assistant based on the Nesta framework.',
+    'You help practitioners design and improve their public engagement projects.',
+    '',
+    isNewSession
+      ? 'The user just started. Welcome them warmly and ask what public engagement challenge they are working on. Keep it to 2-3 sentences. Do not list all 9 questions — just invite them to share their project.'
+      : `The user has addressed ${summary.addressedCount}/9 questions so far. They may be asking a general question or taking a break. Respond helpfully and, if appropriate, gently nudge them back toward their coaching session.`,
+  ].join('\n');
+
+  const response = await openaiClient.chat.completions.create({
+    model: MODEL,
+    messages: [
+      { role: 'system', content: systemContent },
+      { role: 'user', content: message },
+    ],
+  });
+
+  return {
+    message: response.choices[0]?.message?.content || "Hello! What public engagement challenge are you working on today?",
+    type: 'general',
+  };
+}
+
+// ── Unified Chat: Orchestrator Test Endpoint ───────────────
+// Temporary endpoint for testing Phase 1 (orchestrator routing).
+// POST /api/chat/test-route — returns the routing decision without
+// dispatching to any agent.
+
+app.post('/api/chat/test-route', async (req, res) => {
+  const { sessionId, message } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: 'Missing "message" in request body.' });
+  }
+
+  try {
+    const session = getOrCreateSession(sessionId || 'test-session');
+    const routing = await routeMessage(message, session);
+
+    return res.json({
+      routing,
+      sessionSummary: getSessionSummary(session),
+    });
+  } catch (error) {
+    console.error('[chat/test-route] Error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/chat/session/:id — inspect session state
+app.get('/api/chat/session/:id', (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) return res.status(404).json({ error: 'Session not found.' });
+  return res.json(getSessionSummary(session));
+});
+
+// DELETE /api/chat/session/:id — clear a session
+app.delete('/api/chat/session/:id', (req, res) => {
+  const deleted = deleteSession(req.params.id);
+  return res.json({ deleted });
+});
+
+// ── POST /api/chat/reflection ─────────────────────────────
+// Generate a reflection from the unified chat session state.
+// Pulls user responses and coaching conversations from the session
+// instead of from the legacy form-based sessionStorage.
+
+app.post('/api/chat/reflection', async (req, res) => {
+  const { sessionId } = req.body;
+
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Missing "sessionId" in request body.' });
+  }
+
+  const session = getSession(sessionId);
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found.' });
+  }
+
+  const summary = getSessionSummary(session);
+  if (summary.addressedCount < 1) {
+    return res.status(400).json({ error: 'No questions have been addressed yet.' });
+  }
+
+  try {
+    const lines = [
+      'Generate an in-depth reflection for the following Nesta framework coaching journey.',
+      '',
+      '## Coaching Conversations and Progress',
+      '',
+    ];
+
+    for (const q of NESTA_QUESTIONS) {
+      const qs = session.questions[q.id];
+      lines.push(`### Question ${q.id}: ${q.question}`);
+      lines.push(`**Status:** ${qs.status}`);
+
+      if (qs.userResponse) {
+        lines.push(`**Summarized Response:** ${qs.userResponse}`);
+      }
+      if (qs.gap) {
+        lines.push(`**Identified Gap:** ${qs.gap}`);
+      }
+
+      const history = qs.coachingHistory || [];
+      const userMessages = history.filter((m) => m.role === 'user');
+
+      if (history.length > 1 && userMessages.length > 0) {
+        if (qs.status === 'addressed') {
+          lines.push('**Coaching:** PRODUCTIVE CONVERSATION — The user engaged with the coach and resolved this item.');
+        } else {
+          lines.push('**Coaching:** UNRESOLVED WITH ACTIVE CONVERSATION — The user engaged with the coach but has not yet resolved this item.');
+        }
+        lines.push('**Conversation Summary:**');
+        for (const msg of history) {
+          if (msg.role === 'user') {
+            lines.push(`  User: ${msg.content}`);
+          } else {
+            const preview = msg.content.length > 500 ? msg.content.slice(0, 500) + '...' : msg.content;
+            lines.push(`  Coach: ${preview}`);
+          }
+        }
+      } else if (qs.status === 'addressed') {
+        lines.push('**Coaching:** RESOLVED WITHOUT EXTENDED CONVERSATION — The user addressed this question without a long coaching exchange.');
+      } else {
+        lines.push('**Coaching:** NO COACHING SESSION — No conversation occurred and this item remains unresolved.');
+      }
+
+      lines.push('');
+    }
+
+    lines.push('Please produce a comprehensive, evidence-grounded reflection in the required JSON format. Factor in the coaching conversations — acknowledge growth, flag skipped coaching, and note unresolved items.');
+
+    const userMessage = lines.join('\n');
+
+    const result = await runAgentLoop({
+      systemPrompt: GENERATE_REFLECTION_PROMPT,
+      userMessage,
+      tools: agentToolDefinitions,
+      toolImpls: agentToolImplementations,
+      model: MODEL,
+      maxIterations: MAX_ITERATIONS,
+    });
+
+    let parsed;
+    try {
+      const cleaned = result.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      parsed = JSON.parse(cleaned);
+    } catch {
+      console.error('Failed to parse chat reflection response as JSON:', result);
+      return res.status(500).json({ error: 'Failed to parse reflection.' });
+    }
+
+    if (!parsed.reflection) {
+      return res.status(500).json({ error: 'Invalid reflection format.' });
+    }
+
+    res.json(parsed);
+  } catch (error) {
+    console.error('Error generating chat reflection:', error);
+    res.status(500).json({ error: 'Failed to generate reflection.' });
+  }
+});
+
+// ── Unified Chat: Coach Agent Test Endpoint ────────────────
+// POST /api/chat/test-coach — test the coach agent directly.
+// Requires a sessionId and questionId to coach on.
+
+app.post('/api/chat/test-coach', async (req, res) => {
+  const { sessionId, questionId, message } = req.body;
+
+  if (!message || !questionId) {
+    return res.status(400).json({ error: 'Missing "message" or "questionId" in request body.' });
+  }
+
+  try {
+    const session = getOrCreateSession(sessionId || 'test-coach-session');
+    const result = await coachResponse(questionId, message, session);
+
+    return res.json({
+      result,
+      sessionSummary: getSessionSummary(session),
+    });
+  } catch (error) {
+    console.error('[chat/test-coach] Error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// ── Unified Chat: Retrieval Agent Test Endpoint ────────────
+// POST /api/chat/test-retrieve — test the retrieval agent directly.
+
+app.post('/api/chat/test-retrieve', async (req, res) => {
+  const { sessionId, message } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: 'Missing "message" in request body.' });
+  }
+
+  try {
+    const session = getOrCreateSession(sessionId || 'test-retrieve-session');
+    const result = await retrievalResponse(message, session);
+
+    return res.json({ result });
+  } catch (error) {
+    console.error('[chat/test-retrieve] Error:', error);
+    return res.status(500).json({ error: error.message });
   }
 });
 

@@ -1,72 +1,69 @@
-import { Link } from 'react-router';
-import { MessageSquare, BookOpen, ArrowRight } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router';
+import { ArrowRight, Loader2 } from 'lucide-react';
 
 export function Home() {
+  const navigate = useNavigate();
+  const [inputValue, setInputValue] = useState('');
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  const handleSubmit = () => {
+    const text = inputValue.trim();
+    if (!text || isNavigating) return;
+    setIsNavigating(true);
+    // Pass the initial message to the coach via URL state
+    navigate('/coach', { state: { initialMessage: text } });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-6 py-16">
-      <div className="max-w-3xl mx-auto text-center mb-16">
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-73px-200px)] px-6">
+      <div className="max-w-2xl w-full text-center">
         <h1
-          className="text-4xl text-[#124D8F] mb-4"
+          className="text-4xl text-[#124D8F] mb-3"
           style={{ fontFamily: "'DM Serif Display', serif" }}
         >
-          Public Engagement Coaching Tool
+          Public Engagement Coach
         </h1>
-        <p className="text-lg text-gray-600">
-          A practical resource for public sector workers to enhance their public
-          engagement skills through guided coaching and real-world case studies.
+        <p className="text-gray-500 mb-10">
+          Get practical, evidence-based guidance for your public engagement projects.
         </p>
-      </div>
 
-      <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-        <Link
-          to="/coach"
-          className="group p-8 border border-gray-200 rounded-lg hover:border-[#124D8F] transition-all hover:shadow-lg relative overflow-hidden"
-        >
-          <div className="absolute top-0 left-0 w-1 h-full bg-[#124D8F] opacity-0 group-hover:opacity-100 transition-opacity" />
-          <div className="w-12 h-12 bg-[#FDCE3E] text-[#124D8F] rounded-lg flex items-center justify-center mb-4">
-            <MessageSquare className="w-6 h-6" />
-          </div>
-          <h2
-            className="text-2xl text-[#124D8F] mb-3"
-            style={{ fontFamily: "'DM Serif Display', serif" }}
+        <div className="relative">
+          <textarea
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="What public engagement challenge can I help you with today?"
+            rows={3}
+            className="w-full px-5 py-4 text-base border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent leading-relaxed shadow-sm"
+            disabled={isNavigating}
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={!inputValue.trim() || isNavigating}
+            className="absolute bottom-3 right-3 px-4 py-2 bg-[#124D8F] text-white rounded-lg hover:bg-[#0e3d72] transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2 text-sm font-medium"
           >
-            Coach
-          </h2>
-          <p className="text-gray-600 mb-4">
-            Get personalized guidance on your public engagement challenges.
-            Answer questions about your context and receive a tailored,
-            editable implementation plan grounded in course frameworks.
-          </p>
-          <div className="flex items-center text-[#124D8F] font-medium group-hover:gap-2 transition-all">
-            Start coaching session
-            <ArrowRight className="w-4 h-4 ml-1 text-[#D09006]" />
-          </div>
-        </Link>
+            {isNavigating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                Get started
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </div>
 
-        <Link
-          to="/case-studies"
-          className="group p-8 border border-gray-200 rounded-lg hover:border-[#124D8F] transition-all hover:shadow-lg relative overflow-hidden"
-        >
-          <div className="absolute top-0 left-0 w-1 h-full bg-[#124D8F] opacity-0 group-hover:opacity-100 transition-opacity" />
-          <div className="w-12 h-12 bg-[#FDCE3E] text-[#124D8F] rounded-lg flex items-center justify-center mb-4">
-            <BookOpen className="w-6 h-6" />
-          </div>
-          <h2
-            className="text-2xl text-[#124D8F] mb-3"
-            style={{ fontFamily: "'DM Serif Display', serif" }}
-          >
-            Case Studies
-          </h2>
-          <p className="text-gray-600 mb-4">
-            Explore real-world examples of successful public engagement
-            initiatives. Filter by criteria and adapt any case study to your
-            own situation with a simplified coaching flow.
-          </p>
-          <div className="flex items-center text-[#124D8F] font-medium group-hover:gap-2 transition-all">
-            Browse case studies
-            <ArrowRight className="w-4 h-4 ml-1 text-[#D09006]" />
-          </div>
-        </Link>
+        <p className="text-xs text-gray-400 mt-4">
+          Powered by a curated knowledge base of public engagement guides, case studies, and best practices.
+        </p>
       </div>
     </div>
   );

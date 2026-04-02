@@ -21,7 +21,7 @@ export function Layout() {
               <Link
                 to="/coach"
                 className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors text-sm font-medium ${
-                  location.pathname === '/coach'
+                  location.pathname.startsWith('/coach')
                     ? 'bg-white/20 text-white'
                     : 'text-white/80 hover:bg-white/10 hover:text-white'
                 }`}
@@ -58,11 +58,11 @@ export function Layout() {
         <div className="h-1 bg-[#FDCE3E]" />
       </nav>
 
-      <main className="flex-1">
+      <main className="flex-1 overflow-hidden">
         <Outlet />
       </main>
 
-      <footer className="bg-[#124D8F] text-white mt-16">
+      <footer className={`bg-[#124D8F] text-white mt-16 ${location.pathname === '/coach' ? 'hidden' : ''}`}>
         <div className="max-w-7xl mx-auto px-6 py-10">
           <div className="grid md:grid-cols-2 gap-8">
             <div>
@@ -129,7 +129,7 @@ export function Layout() {
         </div>
       </footer>
 
-      {!location.pathname.startsWith('/coach/dashboard') && <ChatBot />}
+      {!location.pathname.startsWith('/coach') && <ChatBot />}
     </div>
   );
 }

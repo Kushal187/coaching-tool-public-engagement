@@ -17,3 +17,7 @@ export const EVALUATE_ASSESSMENT_PROMPT = read('evaluate-assessment.txt');
 export const GENERATE_REFLECTION_PROMPT = read('generate-reflection.txt');
 export const SCORE_CASE_STUDIES_PROMPT = read('score-case-studies.txt');
 export const CLASSIFY_SYSTEM = read('classify-document.txt');
+export const ORCHESTRATOR_PROMPT = read('orchestrator.txt');
+export const COACH_AGENT_PROMPT = read('coach-agent.txt');
+export const RETRIEVAL_AGENT_PROMPT = read('retrieval-agent.txt');
+export const SUGGEST_NEXT_PROMPT = read('suggest-next.txt');

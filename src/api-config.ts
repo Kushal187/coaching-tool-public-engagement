@@ -29,6 +29,10 @@ export const API = {
   generateReflection: llmEndpoint(AGENT_JSON_URL, '/api/generate-reflection', '/api/generate-reflection'),
   analyzeCrossResolution: llmEndpoint(LLM_JSON_URL, '/api/analyze-cross-resolution', '/api/analyze-cross-resolution'),
   scoreCaseStudies: llmEndpoint(SCORE_CS_URL, '/api/score-case-studies', '/api/score-case-studies'),
+  // Unified coaching chat
+  chat: { url: '/api/chat' },
+  chatSession: { url: '/api/chat/session' },
+  chatReflection: llmEndpoint(AGENT_JSON_URL, '/api/chat/reflection', '/api/chat/reflection'),
   // Non-LLM endpoints (always relative, via CloudFront -> API Gateway)
   caseStudies: { url: '/api/case-studies' },
   adminStats: { url: '/api/admin/stats' },

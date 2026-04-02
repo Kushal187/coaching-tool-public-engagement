@@ -1,4 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 
-Element.prototype.scrollTo = () => {};
-Element.prototype.scrollIntoView = () => {};
+if (typeof Element !== 'undefined') {
+  Element.prototype.scrollTo = () => {};
+  Element.prototype.scrollIntoView = () => {};
+}

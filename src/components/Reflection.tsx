@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router';
+import { useNavigate, useLocation, Link } from 'react-router';
 import {
   Download,
   ChevronLeft,
@@ -41,6 +41,10 @@ interface ReflectionData {
 
 export function Reflection() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // sessionId is passed from UnifiedChat when using the new session-based flow
+  const chatSessionId = (location.state as { sessionId?: string })?.sessionId;
+
   const [reflection, setReflection] = useState<ReflectionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -53,6 +57,28 @@ export function Reflection() {
     setLoading(true);
     setError('');
 
+    // New session-based flow: fetch reflection from /api/chat/reflection
+    if (chatSessionId) {
+      try {
+        const res = await fetch(...postBody(API.chatReflection, { sessionId: chatSessionId }));
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          throw new Error(errData?.error || 'Reflection generation failed');
+        }
+
+        const data = await res.json();
+        setReflection(data.reflection);
+      } catch (err) {
+        console.error('Failed to generate session reflection:', err);
+        setError('Failed to generate your reflection. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Legacy flow: read from sessionStorage
     const savedResponses = sessionStorage.getItem('nestaResponses');
     const savedEvaluations = sessionStorage.getItem('nestaEvaluations');
 
@@ -752,11 +778,11 @@ export function Reflection() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => navigate('/coach/dashboard')}
+          onClick={() => navigate(chatSessionId ? '/coach' : '/coach/dashboard')}
           className="px-8 py-3"
         >
           <ChevronLeft className="w-5 h-5" />
-          Back to Dashboard
+          {chatSessionId ? 'Back to Chat' : 'Back to Dashboard'}
         </Button>
       </div>
     </div>
