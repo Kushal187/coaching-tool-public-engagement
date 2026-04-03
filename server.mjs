@@ -12,6 +12,8 @@ import {
   agentToolDefinitions,
   agentToolImplementations,
   buildSourceDocuments,
+  searchKnowledgeBase,
+  formatSearchResultsAsContext,
 } from './lib/agent-tools.mjs';
 import { formatSSEChunk, formatSSESources, formatSSEDone } from './lib/sse.mjs';
 import adminRoutes from './lib/admin-routes.mjs';
@@ -36,7 +38,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MODEL = process.env.CHATBOT_MODEL || 'gpt-5.1';
-const MAX_ITERATIONS = 5;
+const MAX_ITERATIONS = 3;
 
 app.use(express.json({ limit: '50mb' }));
 
@@ -1249,18 +1251,44 @@ app.post('/api/chat/reflection', async (req, res) => {
       lines.push('');
     }
 
+    // Pre-fetch knowledge base evidence in parallel (avoids multi-iteration agent loop)
+    const searchQueries = NESTA_QUESTIONS.map((q) => {
+      const qs = session.questions[q.id];
+      const parts = [q.question];
+      if (qs.gap) parts.push(qs.gap);
+      return searchKnowledgeBase({ query: parts.join(' — ') });
+    });
+
+    const searchResults = await Promise.all(searchQueries);
+    const allHits = searchResults.flatMap((r) => r.results || []);
+
+    // Deduplicate by documentId + chunkIndex
+    const seen = new Set();
+    const uniqueHits = allHits.filter((h) => {
+      const key = `${h.documentId}:${h.chunkIndex}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    lines.push('## Relevant Knowledge Base Evidence');
+    lines.push('');
+    lines.push(formatSearchResultsAsContext(uniqueHits));
+    lines.push('');
     lines.push('Please produce a comprehensive, evidence-grounded reflection in the required JSON format. Factor in the coaching conversations — acknowledge growth, flag skipped coaching, and note unresolved items.');
 
     const userMessage = lines.join('\n');
 
-    const result = await runAgentLoop({
-      systemPrompt: GENERATE_REFLECTION_PROMPT,
-      userMessage,
-      tools: agentToolDefinitions,
-      toolImpls: agentToolImplementations,
+    // Single LLM call — evidence is pre-fetched so no agent loop needed
+    const response = await openaiClient.chat.completions.create({
       model: MODEL,
-      maxIterations: MAX_ITERATIONS,
+      messages: [
+        { role: 'system', content: GENERATE_REFLECTION_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
     });
+
+    const result = response.choices[0].message.content;
 
     let parsed;
     try {
