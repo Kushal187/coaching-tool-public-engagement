@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react';
 
 type SourceInfo = {
   title: string;
+  sourceFile?: string;
   sourceUrl?: string;
   contentTypeLabel?: string | null;
 };
@@ -48,6 +49,14 @@ function buildSourceMap(sources: SourceInfo[]): Map<string, string> {
 
     const cleanedBase = cleanName(base);
     if (cleanedBase && cleanedBase !== base) map.set(cleanedBase, url);
+
+    // Also index by sourceFile (the human-readable label the LLM cites)
+    if (s.sourceFile) {
+      const sf = s.sourceFile.toLowerCase();
+      if (!map.has(sf)) map.set(sf, url);
+      const cleanedSf = cleanName(sf);
+      if (cleanedSf && cleanedSf !== sf && !map.has(cleanedSf)) map.set(cleanedSf, url);
+    }
   }
   return map;
 }
@@ -71,20 +80,20 @@ function findUrl(name: string, map: Map<string, string>): string | undefined {
     }
   }
 
+  // Word-overlap fallback: match if enough significant words overlap
+  const nameWords = lower.split(/[\s\-–—,]+/).filter((w) => w.length > 3);
+  if (nameWords.length >= 2) {
+    for (const [key, url] of map) {
+      const matches = nameWords.filter((w) => key.includes(w));
+      if (matches.length >= 2 && matches.length >= nameWords.length * 0.4) return url;
+    }
+  }
+
   return undefined;
 }
 
-function getTextContent(node: ReactNode): string {
-  if (typeof node === 'string') return node;
-  if (typeof node === 'number') return String(node);
-  if (Array.isArray(node)) return node.map(getTextContent).join('');
-  if (node && typeof node === 'object' && 'props' in node) {
-    return getTextContent((node as { props: { children?: ReactNode } }).props.children);
-  }
-  return '';
-}
-
 // ── Rendered elements ──────────────────────────────────────
+
 
 function Citation({ name, url }: { name: string; url?: string }) {
   const label = cleanName(name);
@@ -108,26 +117,6 @@ function Citation({ name, url }: { name: string; url?: string }) {
   return <span className={`${base} bg-gray-50 text-gray-500 border-gray-200`}>{label}</span>;
 }
 
-function SourceLink({
-  children,
-  url,
-}: {
-  children: ReactNode;
-  url: string;
-}) {
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="font-medium text-[#124D8F] underline decoration-[#124D8F]/30 hover:decoration-[#124D8F] transition-colors"
-    >
-      {children}
-      <ExternalLink className="w-3 h-3 ml-0.5 inline-block align-baseline" />
-    </a>
-  );
-}
-
 // ── Text transforms ────────────────────────────────────────
 
 function splitCitations(text: string, sourceMap: Map<string, string>): ReactNode[] {
@@ -138,8 +127,12 @@ function splitCitations(text: string, sourceMap: Map<string, string>): ReactNode
 
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
-    const name = m[1].trim();
-    parts.push(<Citation key={`c${m.index}`} name={name} url={findUrl(name, sourceMap)} />);
+    // Handle semicolon-separated multi-source citations
+    const names = m[1].split(';').map((n: string) => n.trim()).filter(Boolean);
+    for (let i = 0; i < names.length; i++) {
+      if (i > 0) parts.push(' ');
+      parts.push(<Citation key={`c${m.index}-${i}`} name={names[i]} url={findUrl(names[i], sourceMap)} />);
+    }
     last = m.index + m[0].length;
   }
 
@@ -199,9 +192,6 @@ export function MarkdownContent({ children, sources = [], compact = false }: Pro
           <strong className="font-semibold text-gray-900">{c}</strong>
         ),
         em: ({ children: c }) => {
-          const text = getTextContent(c);
-          const url = text ? findUrl(text, sourceMap) : undefined;
-          if (url) return <SourceLink url={url}>{c}</SourceLink>;
           return <em className="text-gray-600 not-italic font-medium">{c}</em>;
         },
         hr: () => <hr className={`${compact ? 'my-3' : 'my-6'} border-gray-200`} />,

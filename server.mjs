@@ -1080,6 +1080,7 @@ app.post('/api/chat', async (req, res) => {
     });
 
     // 5. Stream response via SSE
+    console.log(`[chat] sources: ${JSON.stringify((result.sources || []).slice(0, 2).map(s => ({ title: s.title?.slice(0, 40), sf: s.sourceFile?.slice(0, 40), url: !!s.sourceUrl })))}`);
     initSSE(res);
     res.write(formatSSEChunk(result.message));
 
@@ -1091,6 +1092,7 @@ app.post('/api/chat', async (req, res) => {
         questionId: routing.questionId,
         resolved: result.resolved || false,
         suggestions: result.suggestions || null,
+        sources: result.sources || [],
         sessionSummary: getSessionSummary(session),
       },
     })}\n\n`);

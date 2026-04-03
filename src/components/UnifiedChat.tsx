@@ -18,12 +18,20 @@ type Suggestion = {
   reason: string;
 };
 
+type SourceInfo = {
+  title: string;
+  sourceFile?: string;
+  sourceUrl?: string;
+  contentTypeLabel?: string | null;
+};
+
 type MessageMetadata = {
   sessionId?: string;
   handler?: string;
   questionId?: number | null;
   resolved?: boolean;
   suggestions?: Suggestion[] | null;
+  sources?: SourceInfo[];
   sessionSummary?: SessionSummary;
 };
 
@@ -341,7 +349,7 @@ export function UnifiedChat() {
               >
                 {message.content ? (
                   message.role === 'assistant' ? (
-                    <MarkdownContent>
+                    <MarkdownContent sources={message.metadata?.sources}>
                       {message.content.replace(/###\s*Sources[\s\S]*$/, '').trim()}
                     </MarkdownContent>
                   ) : (
