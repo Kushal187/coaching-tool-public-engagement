@@ -142,21 +142,6 @@ export function Home() {
             {/* Feature 2 */}
             <div className="border border-gray-200 rounded-[20px] p-6 hover:shadow-[4px_8px_15px_rgba(18,77,143,0.15)] transition-shadow">
               <div className="w-10 h-10 rounded-lg bg-[#E4EFFC] flex items-center justify-center mb-4">
-                <BookOpen className="w-5 h-5 text-[#124D8F]" />
-              </div>
-              <h3 className="font-semibold text-[#124D8F] mb-2">
-                Case Study Library
-              </h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Browse real-world public engagement examples – governance,
-                climate, health, education, urban planning, and more. You can
-                search these during coaching or on your own.
-              </p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="border border-gray-200 rounded-[20px] p-6 hover:shadow-[4px_8px_15px_rgba(18,77,143,0.15)] transition-shadow">
-              <div className="w-10 h-10 rounded-lg bg-[#E4EFFC] flex items-center justify-center mb-4">
                 <FileText className="w-5 h-5 text-[#124D8F]" />
               </div>
               <h3 className="font-semibold text-[#124D8F] mb-2">
@@ -167,6 +152,21 @@ export function Home() {
                 where you stand. It shows what you've figured out, what still
                 needs work, and gives you a short list of priority actions with
                 timelines.
+              </p>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="border border-gray-200 rounded-[20px] p-6 hover:shadow-[4px_8px_15px_rgba(18,77,143,0.15)] transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-[#E4EFFC] flex items-center justify-center mb-4">
+                <BookOpen className="w-5 h-5 text-[#124D8F]" />
+              </div>
+              <h3 className="font-semibold text-[#124D8F] mb-2">
+                Case Study Library
+              </h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Browse real-world public engagement examples – governance,
+                climate, health, education, urban planning, and more. You can
+                search these during coaching or on your own.
               </p>
             </div>
           </div>
