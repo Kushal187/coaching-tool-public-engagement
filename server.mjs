@@ -904,6 +904,49 @@ app.post('/api/score-case-studies', async (req, res) => {
   }
 });
 
+// ── GET /api/sources ────────────────────────────────────────
+// Public endpoint returning deduplicated knowledge base sources
+// for the About page transparency section.
+
+app.get('/api/sources', async (_req, res) => {
+  try {
+    const result = await weaviateClient.graphql
+      .get()
+      .withClassName('CoachingTool')
+      .withFields('doc_name source_label source_url content_type doc_date')
+      .withLimit(500)
+      .do();
+
+    const hits = result?.data?.Get?.CoachingTool ?? [];
+
+    const seen = new Map();
+    for (const h of hits) {
+      const key = h.source_label || h.doc_name;
+      if (!key || seen.has(key)) continue;
+      seen.set(key, {
+        name: h.source_label || h.doc_name || 'Untitled',
+        url: h.source_url || '',
+        contentType: h.content_type || 'other',
+        date: h.doc_date || '',
+      });
+    }
+
+    const sources = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+
+    // Override URLs that point to individual pages rather than the source itself
+    for (const s of sources) {
+      if (s.url.includes('participedia.net/case/')) {
+        s.url = 'https://participedia.net';
+      }
+    }
+
+    res.json(sources);
+  } catch (err) {
+    console.error('[sources] Error:', err.message);
+    res.status(500).json({ error: 'Failed to load sources.' });
+  }
+});
+
 // ── GET /api/case-studies ───────────────────────────────────
 
 app.get('/api/case-studies', async (req, res) => {

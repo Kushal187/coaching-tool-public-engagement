@@ -1,6 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router';
-import { MessageSquare, BookOpen, Settings } from 'lucide-react';
-import { ChatBot } from './ChatBot';
+import { MessageSquare, BookOpen, Info } from 'lucide-react';
 
 export function Layout() {
   const location = useLocation();
@@ -42,15 +41,15 @@ export function Layout() {
                 Case Studies
               </Link>
               <Link
-                to="/admin"
+                to="/about"
                 className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors text-sm font-medium ${
-                  location.pathname.startsWith('/admin')
+                  location.pathname === '/about'
                     ? 'bg-white/20 text-white'
                     : 'text-white/80 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                <Settings className="w-4 h-4" />
-                Admin
+                <Info className="w-4 h-4" />
+                About
               </Link>
             </div>
           </div>
@@ -91,10 +90,10 @@ export function Layout() {
                   Case Studies
                 </Link>
                 <Link
-                  to="/admin"
+                  to="/about"
                   className="text-sm text-white/70 hover:text-[#FDCE3E] transition-colors"
                 >
-                  Admin
+                  About
                 </Link>
               </div>
             </div>
@@ -129,7 +128,6 @@ export function Layout() {
         </div>
       </footer>
 
-      {!location.pathname.startsWith('/coach') && <ChatBot />}
     </div>
   );
 }

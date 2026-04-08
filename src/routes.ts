@@ -5,6 +5,7 @@ import { UnifiedChat } from "./components/UnifiedChat";
 import { Reflection } from "./components/Reflection";
 import { CaseStudies } from "./components/CaseStudies";
 import { CaseStudyDetail } from "./components/CaseStudyDetail";
+import { About } from "./components/About";
 import { AdminLayout } from "./components/admin/AdminLayout";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
 import { DocumentExplorer } from "./components/admin/DocumentExplorer";
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
       { path: "coach/reflection", Component: Reflection },
       { path: "case-studies", Component: CaseStudies },
       { path: "case-studies/:caseStudyId", Component: CaseStudyDetail },
+      { path: "about", Component: About },
       {
         path: "admin",
         Component: AdminLayout,
