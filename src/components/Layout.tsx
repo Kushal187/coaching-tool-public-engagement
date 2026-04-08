@@ -9,12 +9,12 @@ export function Layout() {
       <nav className="bg-[#124D8F]">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <Link
-              to="/"
-              className="text-xl text-white"
-              style={{ fontFamily: "'DM Serif Display', serif" }}
-            >
-              Public Engagement Coach
+            <Link to="/" className="flex items-center">
+              <img
+                src="/innovateus-wordmark-dark.png"
+                alt="InnovateUS"
+                className="h-7"
+              />
             </Link>
             <div className="flex gap-2">
               <Link
@@ -123,6 +123,9 @@ export function Layout() {
             <p className="text-xs text-white/40 text-center">
               &copy; {new Date().getFullYear()} InnovateUS &middot; The
               Governance Lab
+            </p>
+            <p className="text-xs text-white/50 text-center mt-2">
+              Made with ❤️ by AI for Impact
             </p>
           </div>
         </div>
