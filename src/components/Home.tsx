@@ -51,13 +51,13 @@ export function Home() {
               onKeyDown={handleKeyDown}
               placeholder="What public engagement challenge can I help you with today?"
               rows={5}
-              className="w-full px-6 py-5 text-lg border border-gray-200 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent leading-relaxed shadow-sm"
+              className="w-full px-6 py-5 text-lg border border-gray-200 rounded-[20px] resize-none focus:outline-none focus:ring-2 focus:ring-[#124D8F] focus:border-transparent leading-relaxed shadow-[4px_4px_7px_rgba(18,77,143,0.14)]"
               disabled={isNavigating}
             />
             <button
               onClick={handleSubmit}
               disabled={!inputValue.trim() || isNavigating}
-              className="absolute bottom-4 right-4 px-5 py-2.5 bg-[#124D8F] text-white rounded-lg hover:bg-[#0e3d72] transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2 text-base font-medium"
+              className="absolute bottom-4 right-4 px-5 py-2.5 bg-[#124D8F] text-white rounded-full hover:bg-[#0e3d72] transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2 text-base font-medium"
             >
               {isNavigating ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -88,7 +88,7 @@ export function Home() {
       {/* What is this */}
       <section id="learn-more" className="px-6 py-16">
         <div className="max-w-3xl mx-auto">
-          <div className="bg-[#f7fafd] border border-[#d1dce8] rounded-2xl p-8">
+          <div className="bg-[#f7fafd] border border-[#d1dce8] rounded-[20px] p-8">
             <h2
               className="text-2xl text-[#124D8F] mb-4"
               style={{ fontFamily: "'DM Serif Display', serif" }}
@@ -124,7 +124,7 @@ export function Home() {
 
           <div className="grid gap-6 md:grid-cols-3">
             {/* Feature 1 */}
-            <div className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+            <div className="border border-gray-200 rounded-[20px] p-6 hover:shadow-[4px_8px_15px_rgba(18,77,143,0.15)] transition-shadow">
               <div className="w-10 h-10 rounded-lg bg-[#E4EFFC] flex items-center justify-center mb-4">
                 <MessageSquareText className="w-5 h-5 text-[#124D8F]" />
               </div>
@@ -140,7 +140,7 @@ export function Home() {
             </div>
 
             {/* Feature 2 */}
-            <div className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+            <div className="border border-gray-200 rounded-[20px] p-6 hover:shadow-[4px_8px_15px_rgba(18,77,143,0.15)] transition-shadow">
               <div className="w-10 h-10 rounded-lg bg-[#E4EFFC] flex items-center justify-center mb-4">
                 <BookOpen className="w-5 h-5 text-[#124D8F]" />
               </div>
@@ -155,7 +155,7 @@ export function Home() {
             </div>
 
             {/* Feature 3 */}
-            <div className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+            <div className="border border-gray-200 rounded-[20px] p-6 hover:shadow-[4px_8px_15px_rgba(18,77,143,0.15)] transition-shadow">
               <div className="w-10 h-10 rounded-lg bg-[#E4EFFC] flex items-center justify-center mb-4">
                 <FileText className="w-5 h-5 text-[#124D8F]" />
               </div>
@@ -176,7 +176,7 @@ export function Home() {
       {/* What do you get */}
       <section className="px-6 pb-20">
         <div className="max-w-3xl mx-auto">
-          <div className="bg-[#124D8F] text-white rounded-2xl p-8">
+          <div className="bg-[#124D8F] text-white rounded-[20px] p-8">
             <h2
               className="text-2xl mb-4"
               style={{ fontFamily: "'DM Serif Display', serif" }}
@@ -188,19 +188,19 @@ export function Home() {
             </p>
             <ul className="space-y-3 mb-6">
               <li className="flex items-start gap-3">
-                <span className="mt-1.5 w-2 h-2 rounded-full bg-[#FDCE3E] shrink-0" />
+                <span className="mt-1.5 w-2 h-2 rounded-full bg-[#F9C011] shrink-0" />
                 <span className="text-blue-50">
                   An honest assessment of your readiness
                 </span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="mt-1.5 w-2 h-2 rounded-full bg-[#FDCE3E] shrink-0" />
+                <span className="mt-1.5 w-2 h-2 rounded-full bg-[#F9C011] shrink-0" />
                 <span className="text-blue-50">
                   Your strengths and gaps against the framework
                 </span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="mt-1.5 w-2 h-2 rounded-full bg-[#FDCE3E] shrink-0" />
+                <span className="mt-1.5 w-2 h-2 rounded-full bg-[#F9C011] shrink-0" />
                 <span className="text-blue-50">
                   3–5 concrete next steps you can actually act on
                 </span>

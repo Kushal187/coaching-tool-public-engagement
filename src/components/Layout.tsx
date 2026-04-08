@@ -7,13 +7,13 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <nav className="bg-[#124D8F]">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-4 md:px-16 py-3">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center">
               <img
                 src="/innovateus-wordmark-dark.png"
                 alt="InnovateUS"
-                className="h-7"
+                className="h-6"
               />
             </Link>
             <div className="flex gap-2">
@@ -54,7 +54,7 @@ export function Layout() {
             </div>
           </div>
         </div>
-        <div className="h-1 bg-[#FDCE3E]" />
+        <div className="h-1 bg-[#F9C011]" />
       </nav>
 
       <main className="flex-1 overflow-hidden">
@@ -79,19 +79,19 @@ export function Layout() {
               <div className="flex gap-4 mt-4">
                 <Link
                   to="/coach"
-                  className="text-sm text-white/70 hover:text-[#FDCE3E] transition-colors"
+                  className="text-sm text-white/70 hover:text-[#F9C011] transition-colors"
                 >
                   Coach
                 </Link>
                 <Link
                   to="/case-studies"
-                  className="text-sm text-white/70 hover:text-[#FDCE3E] transition-colors"
+                  className="text-sm text-white/70 hover:text-[#F9C011] transition-colors"
                 >
                   Case Studies
                 </Link>
                 <Link
                   to="/about"
-                  className="text-sm text-white/70 hover:text-[#FDCE3E] transition-colors"
+                  className="text-sm text-white/70 hover:text-[#F9C011] transition-colors"
                 >
                   About
                 </Link>
@@ -106,7 +106,7 @@ export function Layout() {
                   href="https://innovate-us.org"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#FDCE3E] hover:text-[#D09006] transition-colors font-medium"
+                  className="text-[#F9C011] hover:text-[#D09006] transition-colors font-medium"
                 >
                   InnovateUS
                 </a>
