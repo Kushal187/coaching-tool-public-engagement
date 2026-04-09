@@ -4,44 +4,44 @@
 
 ```mermaid
 flowchart TD
-    A["Landing Page (/)"] -->|Enter challenge & click 'Get started'| B["Coaching Chat (/coach)"]
-    
-    B -->|Orchestrator routes message| C{Intent Classification}
-    
-    C -->|"map_to_question / coach_continue"| D["Coach Agent\n(Socratic Q&A with\nknowledge base search)"]
-    C -->|retrieve| E["Retrieval Agent\n(Search for examples,\nguides, evidence)"]
-    C -->|suggest_next| F["Suggest Next\n(Recommend next\nquestion)"]
-    C -->|general| G["General Handler\n(Greeting / off-topic)"]
-    
-    D -->|Response streamed via SSE| B
-    E -->|Response streamed via SSE| B
-    F -->|Suggestion chips shown| B
-    G -->|Response streamed via SSE| B
-    
-    D -->|"Question resolved [[RESOLVED]]"| H{All 9 Questions\nAddressed?}
-    
+    A["Landing Page (/)"] -->|"Enter challenge & click Get started"| B["Coaching Chat (/coach)"]
+
+    B ==>|"Every message"| C{"Orchestrator\n(Intent Classification)"}
+
+    C --> D["Coach Agent"]
+    C --> E["Retrieval Agent"]
+    C --> F["Suggest Next"]
+    C --> G["General Handler"]
+
+    D -->|Response| B
+    E -->|Response| B
+    F -->|Suggestions| B
+    G -->|Response| B
+
+    D -->|"Question resolved"| H{"All 9 Questions\nAddressed?"}
     H -->|No| F
-    F -->|User picks a suggestion| D
-    
-    H -->|"Yes (or user clicks\n'Generate Reflection')"| I["Reflection Page\n(/coach/reflection)"]
-    
-    I -->|API generates reflection| J["Reflection Report\n- Summary\n- Strengths\n- Areas to Develop\n- Critical Gaps\n- Priority Actions"]
-    
-    J -->|"'Download Reflection'"| K["PDF Download"]
-    J -->|"'Back to Chat'"| B
-    
+    H -->|Yes| I["Reflection Page\n(/coach/reflection)"]
+
+    I --> J["Reflection Report"]
+    J -->|Download PDF| K["PDF Download"]
+    J -->|Back to Chat| B
     K --> L["Exit / Done"]
 
-    style A fill:#E4EFFC,stroke:#124D8F,color:#124D8F
+    style A fill:#f9fafb,stroke:#d1d5db,color:#374151
     style B fill:#124D8F,stroke:#0e3d72,color:#fff
+    style C fill:#f9fafb,stroke:#9ca3af,color:#374151
+    style D fill:#f3f4f6,stroke:#d1d5db,color:#374151
+    style E fill:#f3f4f6,stroke:#d1d5db,color:#374151
+    style F fill:#f3f4f6,stroke:#d1d5db,color:#374151
+    style G fill:#f3f4f6,stroke:#d1d5db,color:#374151
+    style H fill:#f9fafb,stroke:#9ca3af,color:#374151
     style I fill:#124D8F,stroke:#0e3d72,color:#fff
-    style J fill:#F4F7FB,stroke:#124D8F,color:#124D8F
-    style K fill:#FDCE3E,stroke:#D09006,color:#124D8F
-    style L fill:#fff,stroke:#ccc,color:#666
-    style D fill:#E4EFFC,stroke:#124D8F,color:#124D8F
-    style E fill:#E4EFFC,stroke:#124D8F,color:#124D8F
-    style F fill:#E4EFFC,stroke:#124D8F,color:#124D8F
-    style G fill:#F4F7FB,stroke:#ccc,color:#666
+    style J fill:#f3f4f6,stroke:#d1d5db,color:#374151
+    style K fill:#FDCE3E,stroke:#D09006,color:#374151
+    style L fill:#fff,stroke:#d1d5db,color:#9ca3af
+
+    linkStyle 0 stroke:#124D8F,stroke-width:2px
+    linkStyle 1 stroke:#124D8F,stroke-width:3px
 ```
 
 ## Simplified Linear Flow
