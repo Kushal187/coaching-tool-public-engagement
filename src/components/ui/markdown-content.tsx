@@ -1,7 +1,24 @@
-import { Children, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ExternalLink } from 'lucide-react';
+
+// NOTE: Citation rendering contract
+// The prompts now instruct the LLM to emit numbered inline citations (¹²³…)
+// followed by a "**Sources:**" section at the end of the message, with each
+// source as a markdown hyperlink:
+//
+//   Some statement¹.
+//
+//   **Sources:**
+//   1. [Title](https://url)
+//
+// react-markdown + remark-gfm renders this natively — the superscript glyphs
+// are real Unicode characters (pass-through text), and the Sources list is a
+// standard markdown ordered list with links that gets the `a` component
+// override below. No custom parsing or pill rendering is needed.
+//
+// The `sources` prop is accepted (still passed by UnifiedChat from the SSE
+// metadata) but intentionally unused inside this component — the LLM's own
+// Sources section replaces what the prop used to render.
 
 type SourceInfo = {
   title: string;
@@ -12,149 +29,12 @@ type SourceInfo = {
 
 type Props = {
   children: string;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   sources?: SourceInfo[];
   compact?: boolean;
 };
 
-const CITATION_RE = /\[Source:\s*"?([^"\]]+?)"?(?:,\s*[\w_]+)?\]/g;
-
-function cleanName(raw: string): string {
-  return raw
-    .replace(/\bREVIEWED\b/gi, '')
-    .replace(/\bInternal\b/gi, '')
-    .replace(/\bDRAFT\b/gi, '')
-    .replace(/\bFINAL\b/gi, '')
-    .replace(/^AI\//i, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-}
-
-/**
- * Builds a lowercase name → URL map with multiple lookup keys per source
- * (full title, base doc name without section, cleaned variant).
- */
-function buildSourceMap(sources: SourceInfo[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const s of sources) {
-    if (!s.sourceUrl) continue;
-    const url = s.sourceUrl;
-    const full = s.title.toLowerCase();
-    map.set(full, url);
-
-    const base = s.title.split(' — ')[0].trim().toLowerCase();
-    if (base && base !== full) map.set(base, url);
-
-    const cleaned = cleanName(full);
-    if (cleaned && cleaned !== full && cleaned !== base) map.set(cleaned, url);
-
-    const cleanedBase = cleanName(base);
-    if (cleanedBase && cleanedBase !== base) map.set(cleanedBase, url);
-
-    // Also index by sourceFile (the human-readable label the LLM cites)
-    if (s.sourceFile) {
-      const sf = s.sourceFile.toLowerCase();
-      if (!map.has(sf)) map.set(sf, url);
-      const cleanedSf = cleanName(sf);
-      if (cleanedSf && cleanedSf !== sf && !map.has(cleanedSf)) map.set(cleanedSf, url);
-    }
-  }
-  return map;
-}
-
-function findUrl(name: string, map: Map<string, string>): string | undefined {
-  if (map.size === 0) return undefined;
-  const lower = name.toLowerCase().trim();
-
-  if (map.has(lower)) return map.get(lower);
-
-  const cleaned = cleanName(lower);
-  if (cleaned !== lower && map.has(cleaned)) return map.get(cleaned);
-
-  for (const [key, url] of map) {
-    if (key.includes(lower) || lower.includes(key)) return url;
-  }
-
-  if (cleaned !== lower) {
-    for (const [key, url] of map) {
-      if (key.includes(cleaned) || cleaned.includes(key)) return url;
-    }
-  }
-
-  // Word-overlap fallback: match if enough significant words overlap
-  const nameWords = lower.split(/[\s\-–—,]+/).filter((w) => w.length > 3);
-  if (nameWords.length >= 2) {
-    for (const [key, url] of map) {
-      const matches = nameWords.filter((w) => key.includes(w));
-      if (matches.length >= 2 && matches.length >= nameWords.length * 0.4) return url;
-    }
-  }
-
-  return undefined;
-}
-
-// ── Rendered elements ──────────────────────────────────────
-
-
-function Citation({ name, url }: { name: string; url?: string }) {
-  const label = cleanName(name);
-  const base =
-    'inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 text-[11px] leading-tight font-medium rounded-md border align-baseline';
-
-  if (url) {
-    return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`${base} bg-[#E4EFFC] text-[#124D8F] border-[#124D8F]/20 hover:bg-[#124D8F]/15 hover:text-[#0e3d72] transition-colors no-underline`}
-      >
-        {label}
-        <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
-      </a>
-    );
-  }
-
-  return <span className={`${base} bg-gray-50 text-gray-500 border-gray-200`}>{label}</span>;
-}
-
-// ── Text transforms ────────────────────────────────────────
-
-function splitCitations(text: string, sourceMap: Map<string, string>): ReactNode[] {
-  const parts: ReactNode[] = [];
-  let last = 0;
-  const re = new RegExp(CITATION_RE.source, 'g');
-  let m;
-
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) parts.push(text.slice(last, m.index));
-    // Handle semicolon-separated multi-source citations
-    const names = m[1].split(';').map((n: string) => n.trim()).filter(Boolean);
-    for (let i = 0; i < names.length; i++) {
-      if (i > 0) parts.push(' ');
-      parts.push(<Citation key={`c${m.index}-${i}`} name={names[i]} url={findUrl(names[i], sourceMap)} />);
-    }
-    last = m.index + m[0].length;
-  }
-
-  if (last < text.length) parts.push(text.slice(last));
-  return parts;
-}
-
-function withCitations(children: ReactNode, sourceMap: Map<string, string>): ReactNode {
-  return Children.map(children, (child) => {
-    if (typeof child === 'string') {
-      const parts = splitCitations(child, sourceMap);
-      return parts.length === 1 && typeof parts[0] === 'string' ? parts[0] : <>{parts}</>;
-    }
-    return child;
-  });
-}
-
-// ── Component ──────────────────────────────────────────────
-
-export function MarkdownContent({ children, sources = [], compact = false }: Props) {
-  const sourceMap = buildSourceMap(sources);
-
+export function MarkdownContent({ children, compact = false }: Props) {
   const sz = compact
     ? { h1: 'text-sm', h2: 'text-sm', h3: 'text-[13px]', body: 'text-sm', code: 'text-xs' }
     : { h1: 'text-2xl', h2: 'text-xl', h3: 'text-base', body: 'text-[15px]', code: 'text-sm' };
@@ -174,7 +54,7 @@ export function MarkdownContent({ children, sources = [], compact = false }: Pro
         ),
         p: ({ children: c }) => (
           <p className={`text-gray-700 ${compact ? 'mb-1.5' : 'mb-3'} leading-relaxed ${sz.body}`}>
-            {withCitations(c, sourceMap)}
+            {c}
           </p>
         ),
         ul: ({ children: c }) => (
@@ -185,7 +65,7 @@ export function MarkdownContent({ children, sources = [], compact = false }: Pro
         ),
         li: ({ children: c }) => (
           <li className={`text-gray-700 leading-relaxed ${sz.body} ${compact ? 'pl-0.5' : 'pl-1'}`}>
-            {withCitations(c, sourceMap)}
+            {c}
           </li>
         ),
         strong: ({ children: c }) => (

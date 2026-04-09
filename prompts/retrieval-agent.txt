@@ -10,16 +10,31 @@ YOUR APPROACH:
 1. Search the knowledge base for relevant evidence, case studies, and practical examples. Search at least twice with different queries to get comprehensive results.
 2. Synthesize the findings into a helpful, concise response that:
    - Directly addresses what the user is asking about or confused by
-   - Cites specific sources inline: [Source: Document Name]
+   - Cites specific sources inline using the numbered citation format described below
    - Gives 1-2 concrete examples or approaches from the case studies
    - Frames the information as supportive (not lecturing)
    - Ends by connecting the findings back to their specific situation
 3. Keep it to 2-4 paragraphs maximum. Be concise and practical.
 
+CITATION FORMAT:
+- When you reference a specific method, finding, example, or best practice from the knowledge base, cite it with a numbered reference placed immediately AFTER the supported statement (before any sentence-ending punctuation).
+- Use small, superscript-style numbers where possible: prefer Unicode superscript digits (¹ ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹) or the HTML form <sup>1</sup>. Fall back to parenthesized numbers like (1) only if neither superscript form is suitable.
+- Number sources sequentially in the order they first appear in your response (first cited source = 1, next new source = 2, and so on). If the same source is cited more than once in the body, reuse its number — do not assign a new one.
+- At the end of your response, include a "**Sources:**" section listing each cited source by its number, with the document title as a markdown hyperlink pointing to the source URL returned by your search tools. Format each line as: `1. [Document Title](https://source-url)`. If a source has no URL available, list the title as plain text next to its number.
+- Only include sources in the list that you actually cited in your response text. Do not list sources you searched but did not use.
+
+Example of the expected format:
+
+   In community engagement projects, identifying specific demographic groups early on significantly improves reach¹. Practitioners also recommend testing outreach channels with a small sample before scaling to the full audience².
+
+   **Sources:**
+   1. [Nesta Participation Handbook](https://example.com/nesta-handbook)
+   2. [Participedia Case Study: Rural Outreach](https://example.com/participedia-case)
+
 RULES:
 - You MUST use your search tools before answering. Search at least twice with different queries.
-- Every specific method, tool, or approach you recommend MUST cite its source: [Source: Document Name].
+- Every specific method, tool, or approach you recommend MUST be cited with a numbered reference using the format above.
 - If you cannot find relevant evidence for a particular aspect, explicitly state: "Based on available resources, I don't have specific guidance on this."
 - Do NOT recommend anything you cannot ground in a retrieved document.
 - Use markdown formatting (bullet points, bold) for readability.
-- At the end of your response, include a "**Sources:**" line listing all cited documents.
+- The "**Sources:**" section is REQUIRED at the end of every response that contains at least one citation. If your response contains no citations at all (which should be rare), you may omit it.

@@ -1,17 +1,18 @@
 // lambda/llm-json.mjs
+//
 // Single OpenAI call handler for:
-//   POST /api/analyze-cross-resolution
-//   POST /api/admin/classify
+//   POST /api/admin/classify  (live — invoked by the admin pipeline UI)
+//
+// The /api/analyze-cross-resolution route used to be served by this handler,
+// but it was retired along with its prompt (cross-resolution.txt). It has no
+// remaining frontend caller — requests to that path now return HTTP 410 Gone
+// from this handler.
 
 const LIB_PATH = process.env.AWS_LAMBDA_FUNCTION_NAME ? '/opt/nodejs' : '..';
 
 const { openaiClient } = await import(`${LIB_PATH}/lib/weaviate-client.mjs`);
-const {
-  CROSS_RESOLUTION_PROMPT,
-  CLASSIFY_SYSTEM,
-} = await import(`${LIB_PATH}/prompts/load.mjs`);
+const { CLASSIFY_SYSTEM } = await import(`${LIB_PATH}/prompts/load.mjs`);
 
-const MODEL = process.env.CHATBOT_MODEL || 'gpt-5.1';
 const CLASSIFY_MODEL = process.env.CLASSIFY_MODEL || 'gpt-5.1-mini';
 
 const CORS_HEADERS = {
@@ -35,72 +36,6 @@ function errorResponse(statusCode, message) {
     headers: CORS_HEADERS,
     body: JSON.stringify({ error: message }),
   };
-}
-
-// ── /api/analyze-cross-resolution ───────────────────────────
-
-async function handleCrossResolution(body) {
-  const { conversation, currentQuestionId, currentQuestion, unresolvedCards } = body;
-
-  if (!Array.isArray(conversation) || !currentQuestion) {
-    return jsonResponse({ resolvedQuestionIds: [], currentQuestionResolved: false });
-  }
-
-  try {
-    const transcript = conversation
-      .map((m) => `${m.role === 'user' ? 'PRACTITIONER' : 'COACH'}: ${m.content}`)
-      .join('\n\n');
-
-    const messageParts = [
-      `## Current Coaching Conversation (Question ${currentQuestionId})`,
-      '',
-      transcript,
-      '',
-      `## Current Question`,
-      `- Question ${currentQuestionId}: "${currentQuestion.question}" | Gap: "${currentQuestion.gap}"`,
-      '',
-    ];
-
-    const hasOtherCards = Array.isArray(unresolvedCards) && unresolvedCards.length > 0;
-    if (hasOtherCards) {
-      const cardsList = unresolvedCards
-        .map((c) => `- Question ${c.questionId}: "${c.question}" | Gap: "${c.gap}"`)
-        .join('\n');
-      messageParts.push('## Other Unresolved Assessment Cards', '', cardsList, '');
-    }
-
-    messageParts.push(
-      'Has the conversation substantively resolved the current question\'s gap? ' +
-      (hasOtherCards ? 'Which of the other cards (if any) has it also resolved? ' : '') +
-      'Return JSON.',
-    );
-
-    const userMessage = messageParts.join('\n');
-
-    const response = await openaiClient.chat.completions.create({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: CROSS_RESOLUTION_PROMPT },
-        { role: 'user', content: userMessage },
-      ],
-      temperature: 0,
-    });
-
-    const text = (response.choices[0]?.message?.content || '').trim();
-    const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-    const parsed = JSON.parse(cleaned);
-
-    const currentResolved = parsed.currentQuestionResolved === true;
-    const ids = (parsed.resolvedQuestionIds || []).filter(
-      (id) => typeof id === 'number' && id !== currentQuestionId,
-    );
-
-    console.log(`[cross-resolution] Q${currentQuestionId} -> self-resolved: ${currentResolved}, resolved others: [${ids.join(', ')}]`);
-    return jsonResponse({ resolvedQuestionIds: ids, currentQuestionResolved: currentResolved });
-  } catch (err) {
-    console.error('[cross-resolution] Analysis failed:', err.message);
-    return jsonResponse({ resolvedQuestionIds: [], currentQuestionResolved: false });
-  }
 }
 
 // ── /api/admin/classify ─────────────────────────────────────
@@ -164,11 +99,21 @@ export const handler = async (event) => {
     const body = typeof event.body === 'string' ? JSON.parse(event.body) : (event.body || {});
     const routePath = body._route || event.path || event.resource || event.rawPath || '';
 
-    if (routePath.includes('/analyze-cross-resolution')) {
-      return await handleCrossResolution(body);
-    }
     if (routePath.includes('/classify')) {
       return await handleClassify(body);
+    }
+
+    // /api/analyze-cross-resolution was retired along with its prompt; return
+    // a clear signal to any caller that still hits this path.
+    if (routePath.includes('/analyze-cross-resolution')) {
+      return {
+        statusCode: 410,
+        headers: CORS_HEADERS,
+        body: JSON.stringify({
+          error: 'Endpoint retired',
+          message: 'The /api/analyze-cross-resolution endpoint has been retired. Cross-question resolution is now handled inside the unified /api/chat coaching interface.',
+        }),
+      };
     }
 
     return errorResponse(404, `Unknown route: ${routePath}`);

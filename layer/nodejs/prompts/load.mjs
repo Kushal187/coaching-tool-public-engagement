@@ -5,13 +5,9 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (file) => readFileSync(join(__dirname, file), 'utf-8');
 
-export const CHATBOT_PROMPT = read('chatbot.txt');
-export const GENERATE_PLAN_PROMPT = read('generate-plan.txt');
-export const GENERATE_QUESTIONS_PROMPT = read('generate-questions.txt');
-export const ADAPT_CASE_STUDY_PROMPT = read('adapt-case-study.txt');
-export const EVALUATE_COACHING_PROMPT = read('evaluate-coaching.txt');
-export const CROSS_RESOLUTION_PROMPT = read('cross-resolution.txt');
-export const EVALUATE_ASSESSMENT_PROMPT = read('evaluate-assessment.txt');
-export const GENERATE_REFLECTION_PROMPT = read('generate-reflection.txt');
-export const SCORE_CASE_STUDIES_PROMPT = read('score-case-studies.txt');
+// NOTE: The layer mirror intentionally carries ONLY the prompts that deployed
+// Lambdas actually need. The full set of runtime prompts (orchestrator,
+// coach-agent-open, coach-agent-continue, retrieval-agent, suggest-next,
+// general, generate-reflection) live in the root prompts/ folder and are
+// loaded by server.mjs, which is not packaged as a Lambda.
 export const CLASSIFY_SYSTEM = read('classify-document.txt');

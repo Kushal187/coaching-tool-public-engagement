@@ -3,8 +3,13 @@
 # ──────────────────────────────────────────────
 node_modules/
 package-lock.json
-.netlify/
 
+# Vite build output (served by server.mjs in production)
+dist/
+
+# Vitest / Vite caches
+.vite/
+coverage/
 
 # Docling-converted Markdown files (generated from PDFs)
 documents/converted/
