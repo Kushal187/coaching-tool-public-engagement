@@ -4,6 +4,11 @@
 node_modules/
 package-lock.json
 
+# Netlify build cache (left over from the legacy Netlify Functions sketch;
+# the repo no longer uses Netlify — deploy is Render + AWS CDK — but old
+# artifacts can still regenerate locally if someone runs legacy tooling)
+.netlify/
+
 # Vite build output (served by server.mjs in production)
 dist/
 
